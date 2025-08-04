@@ -95,3 +95,204 @@ To learn more about React Native, take a look at the following resources:
 - [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
 - [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
 - [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+
+
+
+
+
+
+
+# ✅ React Native Advanced Setup Guide
+
+A comprehensive checklist to optimize and configure your React Native app with dynamic imports, fonts, patches, location permissions, and Google Maps.
+
+---
+
+## 📦 1. Enable Dynamic Imports
+
+To use custom path aliases (like `@components/...` or `../../...`):
+
+### Install Babel Plugin
+
+```bash
+npm i -D babel-plugin-module-resolver
+```
+
+### Configure `babel.config.js`
+
+```js
+module.exports = {
+  presets: ['module:metro-react-native-babel-preset'],
+  plugins: [
+    [
+      'module-resolver',
+      {
+        root: ['./'],
+        alias: {
+          '@components': './src/components',
+          '@screens': './src/screens',
+          '@utils': './src/utils',
+        },
+      },
+    ],
+  ],
+};
+```
+
+> 📝 Update aliases based on your folder structure.
+
+### Update `tsconfig.json`
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@components/*": ["src/components/*"],
+      "@screens/*": ["src/screens/*"],
+      "@utils/*": ["src/utils/*"]
+    }
+  }
+}
+```
+
+### Optional: Update `metro.config.js`
+
+```js
+const { getDefaultConfig } = require('metro-config');
+
+module.exports = (async () => {
+  const {
+    resolver: { sourceExts, assetExts },
+  } = await getDefaultConfig();
+
+  return {
+    transformer: {
+      babelTransformerPath: require.resolve('react-native-svg-transformer'),
+    },
+    resolver: {
+      assetExts: assetExts.filter(ext => ext !== 'svg'),
+      sourceExts: [...sourceExts, 'svg'],
+    },
+  };
+})();
+```
+
+---
+
+## 🎨 2. Link Custom Fonts
+
+### Add to `package.json` Scripts
+
+```json
+"scripts": {
+  "link:fonts": "npx react-native-asset"
+}
+```
+
+### Run It
+
+```bash
+npm run link:fonts
+```
+
+---
+
+## 🛠️ 3. Apply Patches Automatically
+
+### Add to `package.json` Scripts
+
+```json
+"scripts": {
+  "postinstall": "npx patch-package"
+}
+```
+
+> This ensures patches from `patch-package` are automatically applied after installing dependencies.
+
+---
+
+## 🍎 4. Install iOS Pods (for New Architecture)
+
+Add this script if you're using CocoaPods and new architecture:
+
+```json
+"scripts": {
+  "pod-install": "RCT_NEW_ARCH_ENABLED=1 bundle exec pod install"
+}
+```
+
+---
+
+## 📍 5. Android Location & Internet Permissions
+
+### In `android/app/src/main/AndroidManifest.xml` (inside `<manifest>`):
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+```
+
+### Inside `<application>`:
+
+```xml
+<application
+    android:usesCleartextTraffic="true"
+    android:hardwareAccelerated="true"
+    ... >
+    
+    <meta-data
+        android:name="com.google.android.geo.API_KEY"
+        android:value="YOUR_GOOGLE_MAP_API_KEY" />
+</application>
+```
+
+### Modify `<activity>` Tag:
+
+```xml
+<activity
+    ...
+    android:windowSoftInputMode="adjustNothing">
+```
+
+---
+
+## 🗺️ 6. Google Maps API Integration
+
+### Add to `<application>` (if not already):
+
+```xml
+<meta-data
+  android:name="com.google.android.geo.API_KEY"
+  android:value="YOUR_GOOGLE_MAP_API_KEY" />
+```
+
+> Replace `YOUR_GOOGLE_MAP_API_KEY` with your actual Google Maps key.
+
+---
+
+## 🔤 7. Vector Icons Optimization
+
+### In `android/app/build.gradle`:
+
+```gradle
+project.ext.vectoricons = [
+    iconFontNames: ['MaterialIcons.ttf','MaterialCommunityIcons.ttf','Ionicons.ttf']
+]
+
+apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+```
+
+> Only the listed fonts will be copied into the APK, saving space.
+
+---
+
+## 🔐 8. Enable Proguard (for release builds)
+
+In `android/app/build.gradle`:
+
+```gradle
+def enableProguardInReleaseBuilds = true
+```

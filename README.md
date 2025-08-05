@@ -122,15 +122,23 @@ npm i -D babel-plugin-module-resolver
 
 ```js
 module.exports = {
-  presets: ['module:metro-react-native-babel-preset'],
+  presets: ['module:@react-native/babel-preset'],
   plugins: [
+    'react-native-reanimated/plugin',
     [
       'module-resolver',
       {
-        root: ['./'],
+        root: ['./src'],
         alias: {
+          '@assets': './src/assets',
           '@components': './src/components',
+          '@constants': './src/constants',
+          '@context': './src/context',
+          '@hooks': './src/hooks',
+          '@navigation': './src/navigation',
           '@screens': './src/screens',
+          '@service': './src/service',
+          '@types': './src/types',
           '@utils': './src/utils',
         },
       },
@@ -139,18 +147,28 @@ module.exports = {
 };
 ```
 
-> 📝 Update aliases based on your folder structure.
+> 📝 All available aliases are configured based on your current folder structure.
 
 ### Update `tsconfig.json`
 
 ```json
 {
+  "extends": "@react-native/typescript-config/tsconfig.json",
   "compilerOptions": {
-    "baseUrl": ".",
+    "typeRoots": ["node_modules/@types","src/types"],
+    "types": ["jest"],
+    "baseUrl": "./src/",
     "paths": {
-      "@components/*": ["src/components/*"],
-      "@screens/*": ["src/screens/*"],
-      "@utils/*": ["src/utils/*"]
+      "@assets/*":["assets/*"],
+      "@components/*":["components/*"],
+      "@constants/*":["constants/*"],
+      "@context/*":["context/*"],
+      "@hooks/*":["hooks/*"],
+      "@navigation/*":["navigation/*"],
+      "@screens/*":["screens/*"],
+      "@service/*":["service/*"],
+      "@types/*":["types/*"],
+      "@utils/*":["utils/*"]
     }
   }
 }
@@ -273,7 +291,50 @@ Add this script if you're using CocoaPods and new architecture:
 
 ---
 
-## 🔤 7. Vector Icons Optimization
+## 📁 7. Using @ Import Aliases
+
+The project is configured with path aliases for cleaner imports. Instead of using relative paths like `../../utils/Constants`, you can use `@utils/Constants`.
+
+### Available Aliases
+
+- `@assets/*` - Access files in `src/assets/`
+- `@components/*` - Access files in `src/components/`
+- `@constants/*` - Access files in `src/constants/`
+- `@context/*` - Access files in `src/context/`
+- `@hooks/*` - Access files in `src/hooks/`
+- `@navigation/*` - Access files in `src/navigation/`
+- `@screens/*` - Access files in `src/screens/`
+- `@service/*` - Access files in `src/service/`
+- `@types/*` - Access files in `src/types/`
+- `@utils/*` - Access files in `src/utils/`
+
+### Example Usage
+
+```tsx
+// Instead of this:
+import { Colors } from '../../utils/Constants'
+
+// Use this:
+import { Colors } from '@utils/Constants'
+
+// Instead of this:
+import MyComponent from '../../../components/MyComponent'
+
+// Use this:
+import MyComponent from '@components/MyComponent'
+```
+
+### Benefits
+
+- ✅ Cleaner, more readable imports
+- ✅ No need to count directory levels
+- ✅ Easier to move files around
+- ✅ Better IDE support with autocomplete
+- ✅ Consistent import structure across the project
+
+---
+
+## 🔤 8. Vector Icons Optimization
 
 ### In `android/app/build.gradle`:
 

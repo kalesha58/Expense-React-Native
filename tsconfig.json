@@ -6,13 +6,19 @@
     "baseUrl": "./src/",
     "paths": {
       "@assets/*":["assets/*"],
-      "@features/*":["features/*"],
-      "@service/*":["service/*"],
-      "@styles/*":["styles/*"],
-      "@navigation/*":["navigation/*"],
       "@components/*":["components/*"],
-      "@state/*":["state/*"],
-      "@utils/*":["utils/*"]
+      "@constants/*":["constants/*"],
+      "@context/*":["context/*"],
+      "@hooks/*":["hooks/*"],
+      "@navigation/*":["navigation/*"],
+      "@screens/*":["screens/*"],
+      "@service/*":["service/*"],
+      "@types/*":["types/*"],
+      "@utils/*":["utils/*"],
+      "@api/*":["api/*"],
+      "@services/*":["services/*"],
+      "@styles/*":["styles/*"],
+      "@config/*":["config/*"]
     }
   }
 }

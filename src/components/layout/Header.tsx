@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native
 import Feather from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { SIZES } from '../../constants/theme';
-import { goBack } from '../../utils/NavigationUtils';
+import { useNavigation } from '@react-navigation/native';
 
 type HeaderProps = {
   title: string;
@@ -19,9 +19,10 @@ export const Header = ({
   showThemeToggle = false,
 }: HeaderProps) => {
   const { colors, isDark, setTheme, theme } = useTheme();
+  const navigation = useNavigation();
   
   const handleBack = () => {
-    goBack();
+    navigation.goBack();
   };
   
   const toggleTheme = () => {
@@ -104,8 +105,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   rightContainer: {
-    width: 40,
+    minWidth: 40,
     alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: 8,
   },
   themeToggle: {
     padding: 4,

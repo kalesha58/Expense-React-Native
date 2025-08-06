@@ -108,16 +108,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({ value = [], onChan
     onChange(newFiles);
   };
 
-  // Share PDF
-  const handleSharePdf = async (file: ReceiptFile) => {
-    try {
-      Alert.alert('Info', 'PDF sharing functionality would be implemented here.');
-      // Placeholder for sharing implementation
-      // await Sharing.shareAsync(file.uri);
-    } catch (error) {
-      Alert.alert('Error', 'Could not share PDF.');
-    }
-  };
+
 
   return (
     <View style={styles.card}>
@@ -128,10 +119,6 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({ value = [], onChan
             <View style={styles.pdfContainer} key={file.uri + idx}>
               <Feather name="file-text" size={40} color="#0572CE" />
               <Text style={styles.pdfFilename} numberOfLines={1}>{file.name || file.uri.split('/').pop()}</Text>
-              <TouchableOpacity style={styles.sharePdfButton} onPress={() => handleSharePdf(file)}>
-                <Feather name="share-2" size={32} color="#fff" style={styles.sharePdfIcon} />
-              </TouchableOpacity>
-              <Text style={styles.sharePdfLabel}>Share PDF</Text>
               <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(idx)}>
                 <Feather name="x" size={14} color="#FFFFFF" />
               </TouchableOpacity>
@@ -260,29 +247,5 @@ const styles = StyleSheet.create({
     width: 80,
     alignSelf: 'center',
   },
-  sharePdfButton: {
-    backgroundColor: '#0572CE',
-    borderRadius: 24,
-    width: 48,
-    height: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 4,
-    shadowColor: '#0572CE',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sharePdfIcon: {
-    alignSelf: 'center',
-  },
-  sharePdfLabel: {
-    color: '#0572CE',
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 2,
-    textAlign: 'center',
-  },
+
 }); 

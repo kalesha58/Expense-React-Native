@@ -12,6 +12,7 @@ import AccountScreen from '../screens/AccountScreen';
 import { CreateExpenseScreen } from '../screens/CreateExpenseScreen';
 import { ExpenseDetailsScreen } from '../screens/ExpenseDetailsScreen';
 import { navigationRef } from '../utils/NavigationUtils';
+import { ExpenseDetail } from '../hooks/useExpenseDetails';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -25,20 +26,13 @@ export type RootStackParamList = {
   CreateExpense: undefined;
   ExpenseDetails: { 
     expense: {
-      LineId: string;
-      ExpenseItem: string;
-      Amount: string;
-      Currency: string;
-      TransactionDate: string;
-      ExpenseStatus: string;
-      BusinessPurpose: string;
-      DepartmentCode: string;
-      Location: string;
-      Supplier: string;
-      Comments: string;
-      ReportName: string;
-      NumberOfDays: string;
-      ToLocation: string;
+      reportHeaderId: string;
+      reportName: string;
+      reportDate: string;
+      totalAmount: number;
+      currency: string;
+      status: 'approved' | 'pending' | 'rejected';
+      items: ExpenseDetail[];
     };
   };
 };

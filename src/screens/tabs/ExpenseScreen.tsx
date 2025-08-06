@@ -15,12 +15,14 @@ import { useTheme } from '../../hooks/useTheme';
 import { Header } from '../../components/layout/Header';
 import { 
   ExpenseCard, 
+  GroupedExpenseCard,
   FilterTabs, 
   SearchBar, 
   EmptyState, 
   LoadingFooter, 
   FloatingActionButton,
   type ExpenseItem,
+  type GroupedExpenseItem,
   type FilterOption
 } from '../../components/expenses';
 import { SIZES } from '../../constants/theme';
@@ -30,39 +32,75 @@ import { RootStackParamList } from '../../navigation/AppNavigator';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-// Transform expense details to ExpenseItem format
-const transformExpenseDetails = (expenseDetails: ExpenseDetail[]): ExpenseItem[] => {
-  return expenseDetails.map((detail) => {
-    // Map the status correctly
-    let status: 'approved' | 'pending' | 'rejected';
-    if (detail.ExpenseStatus === 'INVOICED') {
-      status = 'approved';
-    } else if (detail.ExpenseStatus === 'Pending Manager Approval') {
-      status = 'pending';
-    } else if (detail.ExpenseStatus === 'REJECTED') {
-      status = 'rejected';
+// Transform expense details to grouped ExpenseItem format
+const transformExpenseDetailsToGroups = (expenseDetails: ExpenseDetail[]): GroupedExpenseItem[] => {
+  // Group expenses by ReportHeaderId
+  const groupedMap = new Map<string, ExpenseDetail[]>();
+  
+  expenseDetails.forEach((detail) => {
+    const reportHeaderId = detail.ReportHeaderId;
+    if (!groupedMap.has(reportHeaderId)) {
+      groupedMap.set(reportHeaderId, []);
+    }
+    groupedMap.get(reportHeaderId)!.push(detail);
+  });
+
+  // Transform grouped data to GroupedExpenseItem format
+  return Array.from(groupedMap.entries()).map(([reportHeaderId, items]) => {
+    // Calculate total amount for the group
+    const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.Amount) || 0), 0);
+    
+    // Determine the most critical status (rejected > pending > approved)
+    const statusCounts = {
+      approved: 0,
+      pending: 0,
+      rejected: 0,
+    };
+
+    items.forEach((item) => {
+      if (item.ExpenseStatus === 'INVOICED') {
+        statusCounts.approved++;
+      } else if (item.ExpenseStatus === 'Pending Manager Approval') {
+        statusCounts.pending++;
+      } else {
+        statusCounts.rejected++;
+      }
+    });
+
+    let groupStatus: 'approved' | 'pending' | 'rejected';
+    if (statusCounts.rejected > 0) {
+      groupStatus = 'rejected';
+    } else if (statusCounts.pending > 0) {
+      groupStatus = 'pending';
     } else {
-      status = 'rejected'; // Default to rejected for other statuses
+      groupStatus = 'approved';
     }
 
+    // Use the first item for common report information
+    const firstItem = items[0];
+    
     return {
-      id: detail.LineId,
-      title: detail.ExpenseItem,
-      amount: parseFloat(detail.Amount) || 0,
-      status: status,
-      date: detail.TransactionDate,
-      items: 1, // Each line item represents one expense item
-      category: detail.ExpenseItem,
+      id: reportHeaderId,
+      reportHeaderId: reportHeaderId,
+      reportName: firstItem.ReportName,
+      reportDate: firstItem.ReportDate,
+      title: firstItem.ReportName || `Expense Report ${reportHeaderId}`,
+      amount: totalAmount,
+      totalAmount: totalAmount,
+      status: groupStatus,
+      date: firstItem.TransactionDate,
+      items: items,
+      itemCount: items.length,
+      category: items.length > 1 ? `${items.length} Items` : firstItem.ExpenseItem,
       // Additional fields from the API
-      businessPurpose: detail.BusinessPurpose,
-      departmentCode: detail.DepartmentCode,
-      currency: detail.Currency,
-      location: detail.Location,
-      supplier: detail.Supplier,
-      comments: detail.Comments,
-      reportName: detail.ReportName,
-      numberOfDays: detail.NumberOfDays,
-      toLocation: detail.ToLocation,
+      businessPurpose: firstItem.BusinessPurpose,
+      departmentCode: firstItem.DepartmentCode,
+      currency: firstItem.Currency,
+      location: firstItem.Location,
+      supplier: firstItem.Supplier,
+      comments: firstItem.Comments,
+      numberOfDays: firstItem.NumberOfDays,
+      toLocation: firstItem.ToLocation,
     };
   });
 };
@@ -93,11 +131,11 @@ export const ExpenseScreen: React.FC = () => {
   const flatListRef = useRef<FlatList<any>>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Transform API data to ExpenseItem format
-  const allExpenses = useMemo<ExpenseItem[]>(() => {
-    const transformed = transformExpenseDetails(expenseDetails);
+  // Transform API data to grouped ExpenseItem format
+  const allExpenses = useMemo<GroupedExpenseItem[]>(() => {
+    const transformed = transformExpenseDetailsToGroups(expenseDetails);
     console.log('ExpenseScreen - expenseDetails:', expenseDetails.length);
-    console.log('ExpenseScreen - transformed expenses:', transformed.length);
+    console.log('ExpenseScreen - transformed grouped expenses:', transformed.length);
     return transformed;
   }, [expenseDetails]);
 
@@ -110,11 +148,11 @@ export const ExpenseScreen: React.FC = () => {
       const searchTerm = searchQuery.toLowerCase();
       filtered = filtered.filter(expense => 
         expense.title.toLowerCase().includes(searchTerm) ||
+        expense.reportName.toLowerCase().includes(searchTerm) ||
         expense.category.toLowerCase().includes(searchTerm) ||
         expense.businessPurpose?.toLowerCase().includes(searchTerm) ||
         expense.location?.toLowerCase().includes(searchTerm) ||
         expense.supplier?.toLowerCase().includes(searchTerm) ||
-        expense.reportName?.toLowerCase().includes(searchTerm) ||
         expense.departmentCode?.toLowerCase().includes(searchTerm) ||
         expense.comments?.toLowerCase().includes(searchTerm) ||
         expense.currency?.toLowerCase().includes(searchTerm) ||
@@ -210,27 +248,37 @@ export const ExpenseScreen: React.FC = () => {
 
   const handleExpensePress = useCallback((id: string) => {
     console.log('Expense pressed with id:', id);
-    console.log('Available expenseDetails:', expenseDetails.length);
-    console.log('Sample expenseDetail:', expenseDetails[0]);
+    console.log('Available grouped expenses:', allExpenses.length);
     
-    // Find the original expense detail data by matching the LineId
-    const originalExpenseDetail = expenseDetails.find(detail => detail.LineId === id);
+    // Find the grouped expense by ReportHeaderId
+    const groupedExpense = allExpenses.find(expense => expense.reportHeaderId === id);
     
-    console.log('Found originalExpenseDetail:', originalExpenseDetail);
+    console.log('Found groupedExpense:', groupedExpense);
     
-    if (originalExpenseDetail) {
-      console.log('Navigating to expense details:', originalExpenseDetail);
+    if (groupedExpense) {
+      console.log('Navigating to expense details:', groupedExpense);
       try {
-        navigation.navigate('ExpenseDetails', { expense: originalExpenseDetail });
+        // Transform to the format expected by ExpenseDetailsScreen
+        const expenseDetail = {
+          reportHeaderId: groupedExpense.reportHeaderId,
+          reportName: groupedExpense.reportName,
+          reportDate: groupedExpense.reportDate,
+          totalAmount: groupedExpense.totalAmount,
+          currency: groupedExpense.currency || 'USD',
+          status: groupedExpense.status,
+          items: groupedExpense.items,
+        };
+        
+        navigation.navigate('ExpenseDetails', { expense: expenseDetail });
         console.log('Navigation call completed');
       } catch (error) {
         console.error('Navigation error:', error);
       }
     } else {
-      console.log('Expense detail not found for id:', id);
-      console.log('Available LineIds:', expenseDetails.map(d => d.LineId));
+      console.log('Grouped expense not found for id:', id);
+      console.log('Available ReportHeaderIds:', allExpenses.map(e => e.reportHeaderId));
     }
-  }, [expenseDetails, navigation]);
+  }, [allExpenses, navigation]);
 
   const handleSearchToggle = useCallback(() => {
     setShowSearch(!showSearch);
@@ -244,11 +292,11 @@ export const ExpenseScreen: React.FC = () => {
   }, []);
   
   // Memoized key extractor
-  const keyExtractor = useCallback((item: ExpenseItem) => item.id, []);
+  const keyExtractor = useCallback((item: GroupedExpenseItem) => item.id, []);
   
   // Memoized expense item renderer
-  const renderExpenseItem = useCallback(({ item }: { item: ExpenseItem }) => (
-    <ExpenseCard
+  const renderExpenseItem = useCallback(({ item }: { item: GroupedExpenseItem }) => (
+    <GroupedExpenseCard
       item={item}
       onPress={handleExpensePress}
       onMorePress={handleMorePress}

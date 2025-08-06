@@ -17,7 +17,7 @@ import { Header } from '../../components/layout/Header';
 import { Button } from '../../components/ui/Button';
 import { SIZES } from '../../constants/theme';
 import { navigate } from '../../utils/NavigationUtils';
-import useExpenseDetails from '../../hooks/useExpenseDetails';
+import useExpenseDetails, { type ExpenseDetail } from '../../hooks/useExpenseDetails';
 import { formatTransactionDate } from '../../utils/dateUtils';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 
@@ -25,60 +25,118 @@ type NavigationProp = StackNavigationProp<RootStackParamList>;
 
 const { width } = Dimensions.get('window');
 
+// Transform expense details to grouped format
+const transformExpenseDetailsToGroups = (expenseDetails: ExpenseDetail[]) => {
+  // Group expenses by ReportHeaderId
+  const groupedMap = new Map<string, ExpenseDetail[]>();
+  
+  expenseDetails.forEach((detail) => {
+    const reportHeaderId = detail.ReportHeaderId;
+    if (!groupedMap.has(reportHeaderId)) {
+      groupedMap.set(reportHeaderId, []);
+    }
+    groupedMap.get(reportHeaderId)!.push(detail);
+  });
+
+  // Transform grouped data
+  return Array.from(groupedMap.entries()).map(([reportHeaderId, items]) => {
+    // Calculate total amount for the group
+    const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.Amount) || 0), 0);
+    
+    // Determine the most critical status (rejected > pending > approved)
+    const statusCounts = {
+      approved: 0,
+      pending: 0,
+      rejected: 0,
+    };
+
+    items.forEach((item) => {
+      if (item.ExpenseStatus === 'INVOICED') {
+        statusCounts.approved++;
+      } else if (item.ExpenseStatus === 'Pending Manager Approval') {
+        statusCounts.pending++;
+      } else {
+        statusCounts.rejected++;
+      }
+    });
+
+    let groupStatus: 'approved' | 'pending' | 'rejected';
+    if (statusCounts.rejected > 0) {
+      groupStatus = 'rejected';
+    } else if (statusCounts.pending > 0) {
+      groupStatus = 'pending';
+    } else {
+      groupStatus = 'approved';
+    }
+
+    // Use the first item for common report information
+    const firstItem = items[0];
+    
+    return {
+      id: reportHeaderId,
+      reportHeaderId: reportHeaderId,
+      reportName: firstItem.ReportName,
+      reportDate: firstItem.ReportDate,
+      title: firstItem.ReportName || `Expense Report ${reportHeaderId}`,
+      amount: totalAmount,
+      totalAmount: totalAmount,
+      status: groupStatus,
+      date: firstItem.TransactionDate,
+      items: items,
+      itemCount: items.length,
+    };
+  });
+};
+
 export const HomeScreen: React.FC = () => {
   const { user } = useAuth();
   const { colors, shadows } = useTheme();
   const navigation = useNavigation<NavigationProp>();
   const { expenseDetails, loading } = useExpenseDetails();
   
-  // Transform expense details to recent expenses format
-  const recentExpenses = React.useMemo(() => {
+  // Transform expense details to grouped format
+  const groupedExpenses = React.useMemo(() => {
     if (!expenseDetails || expenseDetails.length === 0) {
       return [];
     }
     
-    // Take the most recent 3 expenses
-    return expenseDetails
-      .slice(0, 3)
-      .map((expense) => {
-        // Map the status correctly
-        let status: 'approved' | 'pending' | 'rejected';
-        if (expense.ExpenseStatus === 'INVOICED') {
-          status = 'approved';
-        } else if (expense.ExpenseStatus === 'Pending Manager Approval') {
-          status = 'pending';
-        } else if (expense.ExpenseStatus === 'REJECTED') {
-          status = 'rejected';
-        } else {
-          status = 'rejected'; // Default to rejected for other statuses
-        }
-
-        return {
-          id: expense.LineId,
-          title: expense.ExpenseItem,
-          amount: parseFloat(expense.Amount) || 0,
-          status: status,
-          date: expense.TransactionDate,
-          businessPurpose: expense.BusinessPurpose,
-          location: expense.Location,
-          supplier: expense.Supplier,
-        };
-      });
+    return transformExpenseDetailsToGroups(expenseDetails);
   }, [expenseDetails]);
   
-  // Calculate statistics
+  // Transform grouped expenses to recent expenses format
+  const recentExpenses = React.useMemo(() => {
+    if (!groupedExpenses || groupedExpenses.length === 0) {
+      return [];
+    }
+    
+    // Take the most recent 3 grouped expenses
+    return groupedExpenses
+      .slice(0, 3)
+      .map((expense) => {
+        return {
+          id: expense.reportHeaderId,
+          title: expense.reportName || expense.title,
+          amount: expense.totalAmount,
+          status: expense.status,
+          date: expense.reportDate,
+          itemCount: expense.itemCount,
+        };
+      });
+  }, [groupedExpenses]);
+  
+  // Calculate statistics from grouped expenses
   const statistics = React.useMemo(() => {
-    if (!expenseDetails || expenseDetails.length === 0) {
+    if (!groupedExpenses || groupedExpenses.length === 0) {
       return { total: 0, pending: 0, approved: 0, rejected: 0 };
     }
     
-    const total = expenseDetails.length;
-    const pending = expenseDetails.filter(e => e.ExpenseStatus === 'Pending Manager Approval').length;
-    const approved = expenseDetails.filter(e => e.ExpenseStatus === 'INVOICED').length;
-    const rejected = expenseDetails.filter(e => e.ExpenseStatus === 'REJECTED').length;
+    const total = groupedExpenses.length;
+    const pending = groupedExpenses.filter(e => e.status === 'pending').length;
+    const approved = groupedExpenses.filter(e => e.status === 'approved').length;
+    const rejected = groupedExpenses.filter(e => e.status === 'rejected').length;
     
     return { total, pending, approved, rejected };
-  }, [expenseDetails]);
+  }, [groupedExpenses]);
   
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -120,14 +178,26 @@ export const HomeScreen: React.FC = () => {
   };
 
   const handleViewExpenseDetails = (id: string) => {
-    // Find the original expense detail data by matching the LineId
-    const originalExpenseDetail = expenseDetails.find(detail => detail.LineId === id);
+    // Find the grouped expense by ReportHeaderId
+    const groupedExpense = groupedExpenses.find(expense => expense.reportHeaderId === id);
     
-    if (originalExpenseDetail) {
-      console.log('Navigating to expense details from HomeScreen:', originalExpenseDetail);
-      navigation.navigate('ExpenseDetails', { expense: originalExpenseDetail });
+    if (groupedExpense) {
+      console.log('Navigating to expense details from HomeScreen:', groupedExpense);
+      
+      // Transform to the format expected by ExpenseDetailsScreen
+      const expenseDetail = {
+        reportHeaderId: groupedExpense.reportHeaderId,
+        reportName: groupedExpense.reportName,
+        reportDate: groupedExpense.reportDate,
+        totalAmount: groupedExpense.totalAmount,
+        currency: 'USD', // Default currency
+        status: groupedExpense.status,
+        items: groupedExpense.items,
+      };
+      
+      navigation.navigate('ExpenseDetails', { expense: expenseDetail });
     } else {
-      console.log('Expense detail not found for id:', id);
+      console.log('Grouped expense not found for id:', id);
     }
   };
   
@@ -317,11 +387,7 @@ export const HomeScreen: React.FC = () => {
                       <Text style={[styles.expenseDate, { color: colors.placeholder }]}>
                         {formatTransactionDate(expense.date)}
                       </Text>
-                      {expense.businessPurpose && (
-                        <Text style={[styles.expensePurpose, { color: colors.placeholder }]} numberOfLines={1}>
-                          {expense.businessPurpose}
-                        </Text>
-                      )}
+                      {/* Removed businessPurpose and location as they are not in the new grouped structure */}
                     </View>
                     <View style={[
                       styles.statusChip,

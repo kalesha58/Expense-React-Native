@@ -13,5 +13,8 @@ export { DepartmentListItem } from './lists';
 // Form Components
 export { SearchBar } from './forms';
 
+// Expense Components
+export * from './expenses';
+
 // UI Components
 export * from './ui'; 

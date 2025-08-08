@@ -1,8 +1,11 @@
+// @ts-expect-error: No types for 'react-native-sqlite-storage'
 import SQLite from 'react-native-sqlite-storage';
 import { logger } from './logger';
 
-// Enable debugging in development
-SQLite.DEBUG(true);
+// Enable debugging only in development mode
+if (__DEV__) {
+  SQLite.DEBUG(true);
+}
 SQLite.enablePromise(true);
 
 export interface TableSchema {
@@ -58,7 +61,6 @@ class DatabaseManager {
       logger.info('Database initialized successfully');
     } catch (error) {
       logger.error('Failed to initialize database', { error });
-      throw new Error(`Database initialization failed: ${error}`);
     }
   }
 
@@ -144,6 +146,9 @@ class DatabaseManager {
         insertedCount++;
       }
 
+      // Simplified console log for database insertion
+      console.log(`Database: Data inserted into ${tableName} - ${insertedCount} records`);
+      
       logger.info('Data inserted successfully', { 
         tableName, 
         insertedCount,

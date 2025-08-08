@@ -290,6 +290,10 @@ export const departmentAPI = {
   getAllDepartments: async (): Promise<ApiResponse> => {
     return apiRequest<ApiResponse>('/23B/getAllDepartments/%22%22', 'GET', undefined, false);
   },
+
+  getAllDepartmentsMetadata: async (): Promise<ApiResponse> => {
+    return apiRequest<ApiResponse>('/23B/getAllDepartments/metadata', 'GET', undefined, false);
+  },
 };
 
 // Currency API
@@ -370,6 +374,26 @@ export async function fetchApi(apiInfo: ApiInfo): Promise<unknown> {
 }
 
 // Receipt Extraction API
+// Expected API Response Structure:
+// {
+//   "Response": {
+//     "business_name": "Villa Contentezza",
+//     "items": [
+//       {
+//         "quantity": 7,
+//         "description": "Nights in apartment Lido",
+//         "price": 700
+//       }
+//     ],
+//     "total_amount": 1060,
+//     "from_location": null,
+//     "to_location": null,
+//     "Expense_Type": "Hotel",
+//     "check_in_date": "2025-08-11",
+//     "check_out_date": "2025-08-18"
+//   },
+//   "Success": true
+// }
 export const receiptExtractionAPI = {
   extractReceiptDetails: async (base64Image: string): Promise<{
     business_name: string;
@@ -426,6 +450,16 @@ export const receiptExtractionAPI = {
         try {
           data = JSON.parse(responseText);
           logger.info('Receipt extraction API parsed response:', { data });
+          
+          // Log the structure to help with debugging
+          logger.info('Response structure analysis:', {
+            hasResponse: !!data.Response,
+            hasSuccess: data.Success,
+            hasBusinessName: !!data.business_name,
+            hasItems: Array.isArray(data.items),
+            responseBusinessName: data.Response?.business_name,
+            responseItems: Array.isArray(data.Response?.items)
+          });
         } catch (parseError) {
           logger.error('JSON parse error for receipt extraction API:', {
             responseText,
@@ -434,13 +468,25 @@ export const receiptExtractionAPI = {
           throw new Error(`Invalid response from receipt extraction service: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
         }
 
-        // Validate response structure
-        if (!data.business_name || !Array.isArray(data.items)) {
+        // Check if the response has the expected structure with Response and Success fields
+        if (data.Response && data.Success === true) {
+          const responseData = data.Response;
+          
+          // Validate response structure
+          if (!responseData.business_name || !Array.isArray(responseData.items)) {
+            logger.error('Invalid response structure from receipt extraction API:', responseData);
+            throw new Error('Invalid response structure from receipt extraction service. Expected business_name and items array in Response field.');
+          }
+          
+          return responseData;
+        } else if (data.business_name && Array.isArray(data.items)) {
+          // Fallback for direct response structure (backward compatibility)
+          logger.info('Using direct response structure (backward compatibility)');
+          return data;
+        } else {
           logger.error('Invalid response structure from receipt extraction API:', data);
-          throw new Error('Invalid response structure from receipt extraction service. Expected business_name and items array.');
+          throw new Error('Invalid response structure from receipt extraction service. Expected Response field with business_name and items array, or Success: true.');
         }
-
-        return data;
       } catch (error) {
         clearTimeout(timeoutId);
         if (error instanceof Error && error.name === 'AbortError') {

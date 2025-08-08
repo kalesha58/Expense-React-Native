@@ -35,7 +35,7 @@ export const Header = ({
       { 
         backgroundColor: colors.primary, 
         borderBottomColor: colors.primary,
-        paddingTop: Platform.OS === 'ios' ? 44 : 10, // Account for status bar
+        paddingTop: Platform.OS === 'ios' ? 44 : 0, // No extra padding needed since status bar is solid
       }
     ]}>
       <View style={styles.content}>

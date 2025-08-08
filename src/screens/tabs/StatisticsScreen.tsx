@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
   Dimensions,
   TouchableOpacity,
   ActivityIndicator,
@@ -15,6 +14,7 @@ import Feather from 'react-native-vector-icons/Feather';
 import { useTheme } from '../../hooks/useTheme';
 import { SIZES, FONTS } from '../../constants/theme';
 import useExpenseDetails, { ExpenseDetail } from '../../hooks/useExpenseDetails';
+import { Header } from '../../components/layout/Header';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -390,54 +390,32 @@ export const StatisticsScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="Statistics" showThemeToggle={true} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.text }]}>Loading statistics...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header title="Statistics" showThemeToggle={true} />
         <View style={styles.errorContainer}>
           <Feather name="alert-circle" size={48} color={colors.error} />
           <Text style={[styles.errorText, { color: colors.text }]}>Failed to load statistics</Text>
           <Text style={[styles.errorSubtext, { color: colors.placeholder }]}>{error}</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Premium Header */}
-      <View style={[styles.premiumHeader, { backgroundColor: colors.primary }]}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity style={[
-            styles.backButton,
-            { backgroundColor: `${colors.white}20` }
-          ]}>
-            <Feather name="arrow-left" size={24} color={colors.white} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={[styles.premiumHeaderTitle, { color: colors.white }]}>
-              Monthly Expenses Status
-            </Text>
-            <Text style={[styles.premiumHeaderSubtitle, { color: colors.white }]}>
-              Financial Overview Dashboard
-            </Text>
-          </View>
-          <TouchableOpacity style={[
-            styles.headerActionButton,
-            { backgroundColor: `${colors.white}20` }
-          ]}>
-            <Feather name="download" size={20} color={colors.white} />
-          </TouchableOpacity>
-        </View>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Header title="Statistics" showThemeToggle={true} />
 
       {/* Filter Section */}
       <View style={[
@@ -620,7 +598,7 @@ export const StatisticsScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

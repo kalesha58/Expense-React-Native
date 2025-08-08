@@ -6,7 +6,7 @@ import {
   ScrollView, 
   TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import Feather from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -45,7 +45,7 @@ export const HomeScreen: React.FC = () => {
 
   
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header 
         title="Reimbursements" 
         showThemeToggle={true}
@@ -161,9 +161,9 @@ export const HomeScreen: React.FC = () => {
 
         
 
-      </ScrollView>
-    </SafeAreaView>
-  );
+              </ScrollView>
+      </View>
+    );
 };
 
 const styles = StyleSheet.create({
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: SIZES.padding,
-    paddingTop: 8, // Reduced from SIZES.padding (16) to 8
+    paddingTop: 4, // Further reduced to minimize spacing
     paddingBottom: 40,
   },
   welcomeSection: {

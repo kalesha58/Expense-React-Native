@@ -8,7 +8,7 @@ import {
   Switch,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
 import { SIZES } from '../../constants/theme';
@@ -72,7 +72,7 @@ export const SettingsScreen: React.FC = () => {
   };
   
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header title="Settings" />
       
       <ScrollView 
@@ -165,7 +165,7 @@ export const SettingsScreen: React.FC = () => {
           </Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

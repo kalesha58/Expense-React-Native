@@ -5,7 +5,7 @@ import {
   TouchableOpacity,
   Text,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+
 import Feather from 'react-native-vector-icons/Feather';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -15,7 +15,6 @@ import {
   ExpenseTabView,
   SearchBar, 
   EmptyState, 
-  FloatingActionButton,
   type GroupedExpenseItem
 } from '../../components/expenses';
 import { SIZES } from '../../constants/theme';
@@ -160,9 +159,7 @@ export const ExpenseScreen: React.FC = () => {
     }
   }, []);
   
-  const handleCreateExpense = useCallback(() => {
-    navigate('CreateExpense', {});
-  }, []);
+
 
 
 
@@ -214,7 +211,7 @@ export const ExpenseScreen: React.FC = () => {
 
   
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header 
         title="Expenses" 
         showThemeToggle={true}
@@ -260,18 +257,14 @@ export const ExpenseScreen: React.FC = () => {
         onMorePress={handleMorePress}
       />
       
-      <FloatingActionButton onPress={handleCreateExpense} />
-    </SafeAreaView>
+
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  listContent: {
-    padding: SIZES.padding,
-    paddingBottom: 100,
   },
   searchResultsInfo: {
     paddingVertical: SIZES.base,

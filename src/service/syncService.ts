@@ -239,6 +239,10 @@ class SyncService {
       result.dataCount = insertedCount;
       result.duration = Date.now() - startTime;
 
+      // Simplified console log for data insertion
+      console.log(`Data inserted: ${apiConfig.tableName} - ${insertedCount} records`);
+      console.log('Data:', data);
+
       logger.info('API sync completed successfully', { 
         apiName: apiConfig.name, 
         dataCount: insertedCount,

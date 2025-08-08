@@ -62,7 +62,7 @@ export const API_SETTINGS: ApiConfig[] = [
   {
     name: 'expense_items',
     displayName: 'Expense Items',
-    metadataEndpoint: '/23B/getExpenseItem/7923/metadata',
+    metadataEndpoint: '/23B/getExpenseItem/metadata',
     dataEndpoint: '/23B/getExpenseItem/7923/%22%22',
     tableName: 'expense_items',
     description: 'Individual expense item details',

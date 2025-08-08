@@ -1,6 +1,6 @@
 import React from 'react';
 import 'react-native-gesture-handler';
-import { StatusBar } from 'react-native';
+import { StatusBar, Platform } from 'react-native';
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
@@ -18,7 +18,9 @@ const AppContent = () => {
     <>
       <StatusBar 
         backgroundColor={colors.primary}
-        barStyle={isDark ? "light-content" : "light-content"}
+        barStyle="light-content"
+        translucent={false}
+        animated={true}
       />
       <AppNavigator />
     </>

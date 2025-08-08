@@ -5,13 +5,13 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   Dimensions,
   Modal,
   Alert,
   PermissionsAndroid,
   Platform,
+  StatusBar,
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -291,7 +291,7 @@ export const ExpenseDetailsScreen: React.FC = () => {
   if (!expense) {
     console.log('ExpenseDetailsScreen - No expense found in params');
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Header
           title="Expense Details"
           showBackButton={true}
@@ -313,7 +313,7 @@ export const ExpenseDetailsScreen: React.FC = () => {
             <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -331,14 +331,14 @@ export const ExpenseDetailsScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Header
         title="Expense Report Details"
         showBackButton={true}
       />
 
-      {/* Sticky Header Card */}
-      <View style={styles.stickyHeader}>
+      {/* Expense Header Card */}
+      <View style={styles.headerCard}>
         <ExpenseHeaderCard expense={expense} />
       </View>
 
@@ -414,20 +414,14 @@ export const ExpenseDetailsScreen: React.FC = () => {
         autoHide={bannerType !== 'loading'}
         duration={bannerType === 'loading' ? 0 : 4000}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: SIZES.padding,
-    paddingBottom: 40,
+    paddingTop: Platform.OS === 'ios' ? 0 : StatusBar.currentHeight,
   },
   notFoundContainer: {
     flex: 1,
@@ -440,11 +434,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontFamily: FONTS.medium,
   },
-  shareButton: {
-    padding: 4,
+  headerCard: {
+    paddingHorizontal: SIZES.padding,
+    paddingTop: SIZES.padding * 2, // Increased padding top for better spacing from header
+    paddingBottom: SIZES.padding,
   },
-
-
+  scrollableContent: {
+    flex: 1,
+  },
+  scrollableContentContainer: {
+    paddingHorizontal: SIZES.padding,
+    paddingTop: SIZES.padding, // Add top padding to scrollable content
+    paddingBottom: 40,
+  },
   itemsSection: {
     marginTop: 24,
     marginBottom: 24,
@@ -478,63 +480,4 @@ const styles = StyleSheet.create({
   itemsList: {
     gap: 12,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    width: '90%',
-    borderRadius: SIZES.radius,
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  modalCloseButton: {
-    padding: 8,
-  },
-  modalTitle: {
-    fontSize: SIZES.large,
-    fontWeight: 'bold',
-    fontFamily: FONTS.bold,
-  },
-  modalContent: {
-    padding: 16,
-  },
-  noAttachmentsContainer: {
-    alignItems: 'center',
-    paddingVertical: 30,
-  },
-  noAttachmentsText: {
-    marginTop: 10,
-    fontSize: SIZES.medium,
-    textAlign: 'center',
-    fontFamily: FONTS.medium,
-  },
-  stickyHeader: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-    backgroundColor: 'transparent',
-    paddingHorizontal: SIZES.padding,
-    paddingTop: 80, // Adjust for header height
-  },
-  scrollableContent: {
-    flex: 1,
-    marginTop: 280, // Adjust based on header card height
-  },
-  scrollableContentContainer: {
-    padding: SIZES.padding,
-    paddingBottom: 40,
-  },
-
 }); 

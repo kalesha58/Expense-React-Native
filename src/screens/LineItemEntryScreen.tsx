@@ -16,12 +16,26 @@ import { Header } from '../components/layout/Header';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Dropdown } from '../components/ui/Dropdown';
+import { TypeSelector } from '../components/ui/ExpenseTypeSelector';
 import { DatePicker } from '../components/ui/DatePicker';
 import { ReceiptUpload } from '../components/ui/ReceiptUpload';
 import { ReceiptUploadFallback } from '../components/ui/ReceiptUploadFallback';
 import { receiptExtractionAPI } from '../service/api';
 import { SIZES } from '../constants/theme';
-import { EXPENSE_TYPES, CURRENCIES, PROJECT_CODES } from '../constants/mockData';
+import { CURRENCIES, PROJECT_CODES } from '../constants/mockData';
+import useExpenseItems from '../hooks/useExpenseItems';
+
+// Fallback expense types if database is empty
+const FALLBACK_EXPENSE_TYPES = [
+  { label: "Travel", value: "TRAVEL" },
+  { label: "Meals", value: "MEALS" },
+  { label: "Accommodation", value: "ACCOMMODATION" },
+  { label: "Transportation", value: "TRANSPORTATION" },
+  { label: "Office Supplies", value: "OFFICE_SUPPLIES" },
+  { label: "Client Entertainment", value: "CLIENT_ENTERTAINMENT" },
+  { label: "Training", value: "TRAINING" },
+  { label: "Miscellaneous", value: "MISCELLANEOUS" },
+];
 import { insertExpense } from '../services/sqlite';
 import { navigate } from '../utils/NavigationUtils';
 import { AsyncStorageService, type LineItem } from '../services/asyncStorage';
@@ -70,6 +84,39 @@ export const LineItemEntryScreen: React.FC = () => {
   const route = useRoute();
   const { colors, shadows } = useTheme();
   const { addLineItem, header, lineItems, isLoading, submitReport } = useExpense();
+  const { expenseItems, expenseTypes, loading: expenseItemsLoading, error: expenseItemsError } = useExpenseItems();
+
+  // Log expense items for debugging
+  React.useEffect(() => {
+    console.log('LineItemEntryScreen - Expense items state:', {
+      expenseItemsCount: expenseItems.length,
+      expenseTypesCount: expenseTypes.length,
+      loading: expenseItemsLoading,
+      error: expenseItemsError
+    });
+    
+    if (expenseItems.length > 0) {
+      console.log('Expense items loaded from database:', expenseItems);
+      console.log('Available expense types:', expenseTypes);
+      console.log('Using database expense types:', expenseTypes.length > 0 ? 'YES' : 'NO (using fallback)');
+      
+      // Log dropdown options
+      const dropdownOptions = expenseItems.map(item => ({ 
+        label: item.expenseItem, 
+        value: item.expenseType 
+      }));
+      console.log('Dropdown options:', dropdownOptions);
+    }
+    if (expenseItemsError) {
+      console.error('Error loading expense items:', expenseItemsError);
+      // Show user-friendly error message
+      Alert.alert(
+        'Database Error',
+        'Failed to load expense types from database. Using default values.',
+        [{ text: 'OK' }]
+      );
+    }
+  }, [expenseItems, expenseTypes, expenseItemsError, expenseItemsLoading]);
 
   const params = route.params as RouteParams;
   const isEditMode = params?.editMode || false;
@@ -343,14 +390,15 @@ export const LineItemEntryScreen: React.FC = () => {
             containerStyle={styles.inputContainer}
           />
 
-          <Dropdown
+          {/* Expense Type Selector - Opens selection screen */}
+          <TypeSelector
             label="Expense Type"
-            placeholder="Select expense type"
-            options={EXPENSE_TYPES}
+            placeholder={expenseItemsLoading ? "Loading expense types..." : "Select expense type"}
             value={expenseType}
             onChange={setExpenseType}
-            error={errors.expenseType}
+            error={errors.expenseType || (expenseItemsError ? "Failed to load expense types" : undefined)}
             containerStyle={styles.inputContainer}
+            disabled={expenseItemsLoading}
           />
 
           <Input

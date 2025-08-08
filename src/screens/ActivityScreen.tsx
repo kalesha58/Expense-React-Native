@@ -22,6 +22,7 @@ import { replace } from "../utils/NavigationUtils";
 import { departmentAPI, currencyAPI, expenseNotificationAPI, expenseItemAPI, expenseDetailsAPI } from "../service/api";
 import { API_SETTINGS } from "../constants/appsettings";
 import { logger } from "../utils/logger";
+import { databaseManager } from "../utils/database";
 
 const { width } = Dimensions.get('window');
 
@@ -59,6 +60,15 @@ const useApiSequence = () => {
       let response: any;
       let dataCount = 0;
 
+      // Initialize database first
+      try {
+        await databaseManager.initialize();
+        console.log('Database initialized successfully');
+      } catch (dbInitError) {
+        console.error('Failed to initialize database:', dbInitError);
+        throw new Error('Database initialization failed');
+      }
+
       // Call the appropriate API based on the name
       switch (apiName) {
         case 'departments':
@@ -80,13 +90,91 @@ const useApiSequence = () => {
           throw new Error(`Unknown API: ${apiName}`);
       }
 
-      // Log the raw response for debugging
-      logger.info('API response received', { apiName, response });
+      // Log the raw response for debugging (simplified)
+      console.log(`API response received: ${apiName}`);
 
       // Process the response
       if (response && (response.data || response.Response)) {
         const data = response.data || response.Response;
         dataCount = Array.isArray(data) ? data.length : 0;
+        
+        // Insert data into database if it's an array
+        if (Array.isArray(data) && data.length > 0) {
+          try {
+            // Get the table name from API settings
+            const apiConfig = API_SETTINGS.find(config => config.name === apiName);
+            if (apiConfig) {
+              // Check if table exists, if not create one using metadata
+              const tableExists = await databaseManager.tableExists(apiConfig.tableName);
+              if (!tableExists) {
+                console.log(`Creating table ${apiConfig.tableName} using metadata...`);
+                
+                // Try to get metadata first, fallback to data-based schema
+                let columns: any[] = [];
+                try {
+                  // Fetch metadata for proper schema
+                  let metadataResponse: any;
+                  switch (apiName) {
+                    case 'departments':
+                      metadataResponse = await departmentAPI.getAllDepartmentsMetadata();
+                      break;
+                    case 'currencies':
+                      metadataResponse = await currencyAPI.getCurrenciesMetadata();
+                      break;
+                    case 'expense_notifications':
+                      metadataResponse = await expenseNotificationAPI.getExpenseNotificationMetadata();
+                      break;
+                    case 'expense_items':
+                      metadataResponse = await expenseItemAPI.getExpenseItemMetadata();
+                      break;
+                    case 'expense_details':
+                      metadataResponse = await expenseDetailsAPI.getExpenseDetailsMetadata();
+                      break;
+                    default:
+                      throw new Error(`No metadata API for ${apiName}`);
+                  }
+                  
+                  // Parse metadata to create columns
+                  if (metadataResponse && (metadataResponse.metadata || metadataResponse.fields || metadataResponse.columns)) {
+                    const metadata = metadataResponse.metadata || metadataResponse.fields || metadataResponse.columns;
+                    columns = metadata.map((field: any) => ({
+                      name: field.name,
+                      type: 'TEXT' as const, // Default to TEXT for simplicity
+                      constraints: []
+                    }));
+                    console.log(`Metadata-based schema created for ${apiConfig.tableName}`);
+                  } else {
+                    throw new Error('Invalid metadata response');
+                  }
+                } catch (metadataError) {
+                  console.log(`Metadata fetch failed for ${apiName}, using data-based schema:`, metadataError);
+                  // Fallback to data-based schema
+                  const firstItem = data[0];
+                  columns = Object.keys(firstItem).map(key => ({
+                    name: key,
+                    type: 'TEXT' as const,
+                    constraints: []
+                  }));
+                }
+                
+                await databaseManager.createTable({
+                  name: apiConfig.tableName,
+                  columns
+                });
+                console.log(`Table ${apiConfig.tableName} created successfully`);
+              }
+              
+              // Insert data into database
+              const insertedCount = await databaseManager.insertData(apiConfig.tableName, data);
+              
+              // Simplified console log for data insertion
+              console.log(`Data inserted: ${apiConfig.tableName} - ${insertedCount} records`);
+              console.log('Data:', data);
+            }
+          } catch (dbError) {
+            console.error(`Failed to insert data into ${apiName} table:`, dbError);
+          }
+        }
         
         setState(prev => ({
           ...prev,
@@ -98,7 +186,7 @@ const useApiSequence = () => {
             }
           }
         }));
-        logger.info('API call completed successfully', { apiName, dataCount });
+        console.log(`API call completed: ${apiName} - ${dataCount} records`);
       } else {
         logger.warn('Invalid response format', { apiName, response });
         throw new Error('Invalid response format - no data found');
@@ -159,7 +247,7 @@ const useApiSequence = () => {
     // Mark as complete
     setIsComplete(true);
     isRunningRef.current = false;
-    logger.info('All API sequences completed');
+    console.log('All API sequences completed');
   };
 
   return {
@@ -178,7 +266,7 @@ export default function ActivityScreen() {
   
   // Log when ActivityScreen is mounted
   React.useEffect(() => {
-    console.log('ActivityScreen mounted successfully');
+    console.log('ActivityScreen mounted');
   }, []);
   
   // Animation values

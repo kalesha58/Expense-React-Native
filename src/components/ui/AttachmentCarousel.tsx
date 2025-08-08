@@ -57,13 +57,6 @@ export const AttachmentCarousel: React.FC<AttachmentCarouselProps> = ({
   const scrollViewRef = useRef<ScrollView>(null);
 
   const handleAttachmentPress = (attachment: Attachment) => {
-    console.log('Attachment pressed:', {
-      fileName: attachment.file_name,
-      contentType: attachment.content_type,
-      base64Start: attachment.BASE64_DATA?.substring(0, 20),
-      isImage: shouldDisplayAsImage(attachment.BASE64_DATA, attachment.content_type),
-      actualType: getActualFileType(attachment.BASE64_DATA, attachment.content_type)
-    });
     setSelectedAttachment(attachment);
     setModalVisible(true);
   };
@@ -95,15 +88,6 @@ export const AttachmentCarousel: React.FC<AttachmentCarouselProps> = ({
   if (!attachments || attachments.length === 0) {
     return null;
   }
-
-  // Debug log to see all attachments and their types
-  console.log('AttachmentCarousel - All attachments:', attachments.map(att => ({
-    fileName: att.file_name,
-    contentType: att.content_type,
-    base64Start: att.BASE64_DATA?.substring(0, 20),
-    actualType: getActualFileType(att.BASE64_DATA, att.content_type),
-    isImage: shouldDisplayAsImage(att.BASE64_DATA, att.content_type)
-  })));
 
   return (
     <>

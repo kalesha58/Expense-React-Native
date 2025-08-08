@@ -44,16 +44,21 @@ const useExpenseItems = (): UseExpenseItemsReturn => {
       const items = await databaseManager.queryData('expense_items');
       
       logger.info('Raw database items:', { items });
+      console.log('Raw expense_items from database:', items);
       
       // Transform the data to match our interface
-      const transformedItems: ExpenseItem[] = items.map((item: any) => ({
-        id: item.id || item.ExpenseItemID || item.expense_item_id,
-        expenseType: item.expenseType || item.ExpenseType || item.expense_type,
-        expenseItem: item.expenseItem || item.ExpenseItem || item.expense_item,
-        expenseReportId: item.expenseReportId || item.ExpenseReportID || item.expense_report_id,
-        flag: item.flag || item.Flag,
-        syncStatus: item.syncStatus || item.SyncStatus || item.sync_status,
-      }));
+      const transformedItems: ExpenseItem[] = items.map((item: any) => {
+        const transformed = {
+          id: item.id || item.ExpenseItemID || item.expense_item_id,
+          expenseType: item.expenseType || item.ExpenseType || item.expense_type,
+          expenseItem: item.expenseItem || item.ExpenseItem || item.expense_item,
+          expenseReportId: item.expenseReportId || item.ExpenseReportID || item.expense_report_id,
+          flag: item.flag || item.Flag,
+          syncStatus: item.syncStatus || item.SyncStatus || item.sync_status,
+        };
+        console.log('Transforming item:', item, 'to:', transformed);
+        return transformed;
+      });
       
       // Extract unique expense types
       const uniqueTypes = [...new Set(transformedItems.map(item => item.expenseType))].filter(Boolean);
@@ -64,6 +69,8 @@ const useExpenseItems = (): UseExpenseItemsReturn => {
         count: transformedItems.length,
         types: uniqueTypes 
       });
+      console.log('Transformed expense items:', transformedItems);
+      console.log('Available expense types:', uniqueTypes);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(errorMessage);

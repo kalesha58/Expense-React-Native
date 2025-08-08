@@ -48,11 +48,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
   const { colors } = useTheme();
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const [isExtracting, setIsExtracting] = useState(false);
-  
-  // Debug isExtracting state changes
-  React.useEffect(() => {
-    console.log('isExtracting state changed to:', isExtracting);
-  }, [isExtracting]);
+
 
   // Variables for bottom sheet
   const snapPoints = useMemo(() => ['25%', '50%'], []);
@@ -112,9 +108,8 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
   // Extract receipt details from image
   const extractReceiptDetails = useCallback(async (fileUri: string) => {
     try {
-      console.log('Starting extraction process for:', fileUri);
       setIsExtracting(true);
-      console.log('isExtracting set to true');
+
       
       // Show initial alert to user
       Alert.alert(
@@ -125,17 +120,14 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
       
       // Validate file format
       if (!isSupportedImageFormat(fileUri)) {
-        console.log('Unsupported file format:', fileUri);
         Alert.alert('Unsupported Format', 'Please select a supported image format (JPG, PNG, GIF, WebP)');
         return;
       }
       
-      console.log('File format validation passed');
       
       // Check file size
       const isAcceptableSize = await isFileSizeAcceptable(fileUri);
       if (!isAcceptableSize) {
-        console.log('File size too large');
         Alert.alert('File Too Large', 'Please select an image smaller than 10MB');
         return;
       }
@@ -200,10 +192,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
         
         // Automatically extract from the first image if extraction callback is provided
         if (onExtractionComplete && newFiles.length > 0) {
-          console.log('Starting receipt extraction for:', newFiles[0].uri);
           extractReceiptDetails(newFiles[0].uri);
-        } else {
-          console.log('No extraction callback provided or no files to extract');
         }
       }
     }
@@ -212,18 +201,28 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
   // Camera functionality
   const handleTakePhoto = useCallback(() => {
     handleDismiss();
-    
-    launchCamera(imagePickerOptions, handleImagePickerResponse);
+
+    launchCamera(
+      {
+        ...imagePickerOptions,
+        quality: 'high', // Fix: quality should be 'high' | 'medium' | 'low' | undefined
+      },
+      handleImagePickerResponse
+    );
   }, [handleImagePickerResponse, handleDismiss]);
 
   // Gallery functionality
   const handlePickImage = useCallback(() => {
     handleDismiss();
-    
-    launchImageLibrary({
-      ...imagePickerOptions,
-      selectionLimit: 5, // Allow multiple selection
-    }, handleImagePickerResponse);
+
+    launchImageLibrary(
+      {
+        ...imagePickerOptions,
+        selectionLimit: 5, // Allow multiple selection
+        quality: 'high', // Fix: quality should be 'high' | 'medium' | 'low' | undefined
+      },
+      handleImagePickerResponse
+    );
   }, [handleImagePickerResponse, handleDismiss]);
 
   // Document picker - keeping as placeholder for now

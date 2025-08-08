@@ -15,7 +15,7 @@ export const DepartmentListItem: React.FC<DepartmentListItemProps> = ({
   onPress,
   isSelected = false,
 }) => {
-  const { colors } = useTheme();
+  const { colors, shadows } = useTheme();
 
   return (
     <TouchableOpacity
@@ -24,10 +24,11 @@ export const DepartmentListItem: React.FC<DepartmentListItemProps> = ({
         { 
           backgroundColor: isSelected ? colors.primary + '10' : colors.card,
           borderLeftColor: isSelected ? colors.primary : 'transparent',
+          ...shadows.small,
         },
       ]}
       onPress={onPress}
-      activeOpacity={0.6}
+      activeOpacity={0.7}
     >
       <View style={styles.content}>
         <View style={styles.textContainer}>
@@ -67,23 +68,25 @@ export const DepartmentListItem: React.FC<DepartmentListItemProps> = ({
 const styles = StyleSheet.create({
   container: {
     borderLeftWidth: 3,
-    marginHorizontal: 16,
-    marginVertical: 2,
-    borderRadius: 8,
+    marginHorizontal: 0,
+    marginVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
   },
   textContainer: {
     flex: 1,
   },
   title: {
     fontSize: SIZES.medium,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   code: {
     fontSize: SIZES.small,
@@ -94,19 +97,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   selectedIndicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkmark: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   arrow: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
   },
 }); 

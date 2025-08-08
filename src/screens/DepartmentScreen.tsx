@@ -42,7 +42,7 @@ const DepartmentScreen = () => {
       if (selected) {
         try {
           logger.info('Navigating to Activity screen', { selectedDepartment: selected.departmentName });
-          // You can pass the selected department as a param if needed
+         
           await replace('Activity');
         } catch (error) {
           logger.error('Navigation error', { error });
@@ -54,46 +54,68 @@ const DepartmentScreen = () => {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}> 
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Header title="Select Department" showBackButton showThemeToggle />
-          <SearchBar
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search by name or code"
-            style={styles.searchBar}
-          />
-          {loading ? (
-            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
-          ) : error ? (
-            <Text style={[styles.error, { color: colors.error }]}>Failed to load departments.</Text>
-          ) : filteredDepartments.length === 0 ? (
-            <View style={styles.noResultsContainer}>
-              <Feather name="search" size={48} color={colors.placeholder} style={{ marginBottom: 8 }} />
-              <Text style={[styles.noResultsText, { color: colors.placeholder }]}>No departments found</Text>
-            </View>
-          ) : (
-            <View style={styles.listContainer}>
-              <FlatList
-                data={filteredDepartments}
-                keyExtractor={(item: Department) => item.id}
-                renderItem={({ item }: { item: Department }) => (
-                  <DepartmentListItem
-                    department={item}
-                    isSelected={selected?.id === item.id}
-                    onPress={() => setSelected(item)}
-                  />
-                )}
-                contentContainerStyle={styles.listContent}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                removeClippedSubviews={true}
-                initialNumToRender={10}
-                maxToRenderPerBatch={10}
-                windowSize={10}
-              />
-            </View>
-          )}
-          <View style={[styles.footer, { backgroundColor: colors.background }]}> 
+          
+          {/* Search Section with Card Styling */}
+          <View style={[styles.searchSection, { backgroundColor: colors.card, ...shadows.small }]}>
+            <SearchBar
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search by name or code"
+              style={styles.searchBar}
+            />
+          </View>
+
+          {/* Content Area */}
+          <View style={styles.contentArea}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={[styles.loadingText, { color: colors.textLight }]}>Loading departments...</Text>
+              </View>
+            ) : error ? (
+              <View style={styles.errorContainer}>
+                <Feather name="alert-circle" size={48} color={colors.error} />
+                <Text style={[styles.errorText, { color: colors.error }]}>Failed to load departments.</Text>
+              </View>
+            ) : filteredDepartments.length === 0 ? (
+              <View style={styles.noResultsContainer}>
+                <Feather name="search" size={48} color={colors.placeholder} style={{ marginBottom: 8 }} />
+                <Text style={[styles.noResultsText, { color: colors.placeholder }]}>No departments found</Text>
+              </View>
+            ) : (
+              <View style={styles.listContainer}>
+                <FlatList
+                  data={filteredDepartments}
+                  keyExtractor={(item: Department) => item.id}
+                  renderItem={({ item }: { item: Department }) => (
+                    <DepartmentListItem
+                      department={item}
+                      isSelected={selected?.id === item.id}
+                      onPress={() => setSelected(item)}
+                    />
+                  )}
+                  contentContainerStyle={styles.listContent}
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  removeClippedSubviews={true}
+                  initialNumToRender={10}
+                  maxToRenderPerBatch={10}
+                  windowSize={10}
+                />
+              </View>
+            )}
+          </View>
+
+          {/* Footer with Card Styling */}
+          <View style={[styles.footer, { backgroundColor: colors.card, ...shadows.medium }]}> 
             <TouchableOpacity
-              style={[styles.continueBtn, { backgroundColor: selected ? colors.button : colors.disabled }]}
+              style={[
+                styles.continueBtn, 
+                { 
+                  backgroundColor: selected ? colors.button : colors.disabled,
+                  ...shadows.small
+                }
+              ]}
               disabled={!selected}
               onPress={handleContinue}
               activeOpacity={selected ? 0.7 : 1}
@@ -112,10 +134,21 @@ const DepartmentScreen = () => {
       flex: 1,
       paddingTop: 0,
     },
-    searchBar: {
+    searchSection: {
       marginHorizontal: 16,
       marginTop: 12,
       marginBottom: 8,
+      borderRadius: 12,
+      padding: 4,
+    },
+    searchBar: {
+      marginHorizontal: 0,
+      marginTop: 0,
+      marginBottom: 0,
+    },
+    contentArea: {
+      flex: 1,
+      marginHorizontal: 16,
     },
     listContainer: {
       flex: 1,
@@ -132,7 +165,7 @@ const DepartmentScreen = () => {
       bottom: 0,
       padding: 16,
       borderTopWidth: 1,
-      borderTopColor: '#eee',
+      borderTopColor: '#E5E7EB',
     },
     continueBtn: {
       width: '100%',
@@ -150,10 +183,28 @@ const DepartmentScreen = () => {
     continueIcon: {
       marginLeft: 8,
     },
-    error: {
-      textAlign: 'center',
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
       marginTop: 40,
+    },
+    loadingText: {
+      marginTop: 16,
       fontSize: 16,
+      fontWeight: '500',
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 40,
+    },
+    errorText: {
+      textAlign: 'center',
+      marginTop: 16,
+      fontSize: 16,
+      fontWeight: '500',
     },
     welcomeSection: {
       flexDirection: 'row',

@@ -252,7 +252,7 @@ export default function ActivityScreen() {
       // Delay navigation to show completion message
       const timer = setTimeout(() => {
         replace('Dashboard');
-      }, 5000); // 5 seconds delay
+      }, 2000); // 5 seconds delay
       
       return () => clearTimeout(timer);
     }
@@ -292,23 +292,6 @@ export default function ActivityScreen() {
           />
         }
       >
-        {/* Header Section */}
-        <Animated.View style={[styles.header, headerAnimatedStyle]}>
-          <View style={styles.headerContent}>
-            <View style={[styles.headerIcon, { backgroundColor: colors.primary + '15' }]}>
-            <Feather name="activity" size={32} color={colors.primary} />
-          </View>
-            <Text style={[styles.title, { color: colors.text }]}>
-              {isComplete ? 'System Ready!' : 'Initializing System'}
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.placeholder }]}>
-              {isComplete 
-                ? 'All systems are operational and ready for use'
-                : 'Setting up your experience and configuring services'
-              }
-            </Text>
-          </View>
-        </Animated.View>
 
         {/* Progress Section */}
         <Animated.View style={[styles.progressSection, progressAnimatedStyle]}>
@@ -356,58 +339,6 @@ export default function ActivityScreen() {
           </View>
         </Animated.View>
 
-        {/* Stats Section */}
-        <Animated.View style={[styles.statsSection, statsAnimatedStyle]}>
-          <View style={styles.statsGrid}>
-            <View style={[
-              styles.statCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.small
-            ]}>
-              <View style={[styles.statIcon, { backgroundColor: colors.success + '15' }]}>
-                <Feather name="check-circle" size={20} color={colors.success} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {completedCount}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.placeholder }]}>
-                Completed
-              </Text>
-            </View>
-            
-            <View style={[
-              styles.statCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.small
-            ]}>
-              <View style={[styles.statIcon, { backgroundColor: colors.warning + '15' }]}>
-                <Feather name="clock" size={20} color={colors.warning} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {apiSequence.filter((api: ApiInfo) => getApiState(api.id).status === "loading").length}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.placeholder }]}>
-                Loading
-              </Text>
-            </View>
-            
-            <View style={[
-              styles.statCard,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.small
-            ]}>
-              <View style={[styles.statIcon, { backgroundColor: colors.error + '15' }]}>
-                <Feather name="alert-circle" size={20} color={colors.error} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.text }]}>
-                {apiSequence.filter((api: ApiInfo) => getApiState(api.id).status === "error").length}
-              </Text>
-              <Text style={[styles.statLabel, { color: colors.placeholder }]}>
-                Errors
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
 
         {/* Services Section */}
         <View style={styles.servicesSection}>
@@ -431,53 +362,6 @@ export default function ActivityScreen() {
           ))}
         </View>
 
-        {/* Completion Section */}
-        {isComplete && apiSequence.every((api: ApiInfo) => getApiState(api.id).status === "success") && (
-          <View style={[
-            styles.completeContainer,
-            { backgroundColor: colors.card, borderColor: colors.border },
-            shadows.medium
-          ]}>
-            <View style={[styles.completeIcon, { backgroundColor: colors.success + '15' }]}>
-              <Feather name="check-circle" size={48} color={colors.success} />
-            </View>
-            <Text style={[styles.completeTitle, { color: colors.text }]}>
-              All Systems Operational!
-            </Text>
-                         <Text style={[styles.completeText, { color: colors.placeholder }]}>
-               Your expense management system is fully initialized and ready for use. Redirecting to dashboard...
-             </Text>
-                         <View style={styles.completeFeatures}>
-               <View style={styles.completeFeature}>
-                 <Feather name="shield" size={16} color={colors.success} />
-                 <Text style={[styles.completeFeatureText, { color: colors.placeholder }]}>
-                   Secure authentication
-                 </Text>
-               </View>
-               <View style={styles.completeFeature}>
-                 <Feather name="database" size={16} color={colors.success} />
-                 <Text style={[styles.completeFeatureText, { color: colors.placeholder }]}>
-                   Data synchronization
-                 </Text>
-               </View>
-               <View style={styles.completeFeature}>
-                 <Feather name="bell" size={16} color={colors.success} />
-                 <Text style={[styles.completeFeatureText, { color: colors.placeholder }]}>
-                   Notification system
-                 </Text>
-               </View>
-             </View>
-             <TouchableOpacity
-               style={[styles.dashboardButton, { backgroundColor: colors.button }]}
-               onPress={() => replace('Dashboard')}
-             >
-               <Feather name="arrow-right" size={20} color="#fff" />
-               <Text style={[styles.dashboardButtonText, { color: '#fff' }]}>
-                 Go to Dashboard
-               </Text>
-             </TouchableOpacity>
-          </View>
-        )}
 
         {/* Sync Button for Failed APIs */}
         {isComplete && apiSequence.some((api: ApiInfo) => getApiState(api.id).status === "error") && !apiSequence.every((api: ApiInfo) => getApiState(api.id).status === "success") && (

@@ -31,6 +31,7 @@ type DropdownProps = {
   dropdownStyle?: StyleProp<ViewStyle>;
   errorStyle?: StyleProp<TextStyle>;
   disabled?: boolean;
+  leftIcon?: React.ReactNode;
 };
 
 export const Dropdown = ({
@@ -45,6 +46,7 @@ export const Dropdown = ({
   dropdownStyle,
   errorStyle,
   disabled = false,
+  leftIcon,
 }: DropdownProps) => {
   const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
@@ -89,11 +91,14 @@ export const Dropdown = ({
         disabled={disabled}
         activeOpacity={0.7}
       >
+        {leftIcon && <View style={styles.iconContainer}>{leftIcon}</View>}
+        
         <Text 
           style={[
             styles.dropdownText, 
             { 
-              color: selectedOption ? colors.text : colors.placeholder 
+              color: selectedOption ? colors.text : colors.placeholder,
+              paddingLeft: leftIcon ? 0 : 12,
             }
           ]}
         >
@@ -183,6 +188,12 @@ const styles = StyleSheet.create({
   dropdownText: {
     fontSize: SIZES.font,
     flex: 1,
+  },
+  iconContainer: {
+    paddingHorizontal: 12,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   error: {
     fontSize: SIZES.small,

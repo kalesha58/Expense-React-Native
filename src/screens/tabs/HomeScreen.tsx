@@ -5,7 +5,6 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from 'react-native-vector-icons/Feather';
@@ -14,197 +13,41 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
 import { Header } from '../../components/layout/Header';
-import { Button } from '../../components/ui/Button';
 import { SIZES } from '../../constants/theme';
 import { navigate } from '../../utils/NavigationUtils';
-import useExpenseDetails, { type ExpenseDetail } from '../../hooks/useExpenseDetails';
-import { formatTransactionDate } from '../../utils/dateUtils';
 import { RootStackParamList } from '../../navigation/AppNavigator';
 
 type NavigationProp = StackNavigationProp<RootStackParamList>;
 
-const { width } = Dimensions.get('window');
 
-// Transform expense details to grouped format
-const transformExpenseDetailsToGroups = (expenseDetails: ExpenseDetail[]) => {
-  // Group expenses by ReportHeaderId
-  const groupedMap = new Map<string, ExpenseDetail[]>();
-  
-  expenseDetails.forEach((detail) => {
-    const reportHeaderId = detail.ReportHeaderId;
-    if (!groupedMap.has(reportHeaderId)) {
-      groupedMap.set(reportHeaderId, []);
-    }
-    groupedMap.get(reportHeaderId)!.push(detail);
-  });
-
-  // Transform grouped data
-  return Array.from(groupedMap.entries()).map(([reportHeaderId, items]) => {
-    // Calculate total amount for the group
-    const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.Amount) || 0), 0);
-    
-    // Determine the most critical status (rejected > pending > approved)
-    const statusCounts = {
-      approved: 0,
-      pending: 0,
-      rejected: 0,
-    };
-
-    items.forEach((item) => {
-      if (item.ExpenseStatus === 'INVOICED') {
-        statusCounts.approved++;
-      } else if (item.ExpenseStatus === 'Pending Manager Approval') {
-        statusCounts.pending++;
-      } else {
-        statusCounts.rejected++;
-      }
-    });
-
-    let groupStatus: 'approved' | 'pending' | 'rejected';
-    if (statusCounts.rejected > 0) {
-      groupStatus = 'rejected';
-    } else if (statusCounts.pending > 0) {
-      groupStatus = 'pending';
-    } else {
-      groupStatus = 'approved';
-    }
-
-    // Use the first item for common report information
-    const firstItem = items[0];
-    
-    return {
-      id: reportHeaderId,
-      reportHeaderId: reportHeaderId,
-      reportName: firstItem.ReportName,
-      reportDate: firstItem.ReportDate,
-      title: firstItem.ReportName || `Expense Report ${reportHeaderId}`,
-      amount: totalAmount,
-      totalAmount: totalAmount,
-      status: groupStatus,
-      date: firstItem.TransactionDate,
-      items: items,
-      itemCount: items.length,
-    };
-  });
-};
 
 export const HomeScreen: React.FC = () => {
   const { user } = useAuth();
   const { colors, shadows } = useTheme();
   const navigation = useNavigation<NavigationProp>();
-  const { expenseDetails, loading } = useExpenseDetails();
   
-  // Transform expense details to grouped format
-  const groupedExpenses = React.useMemo(() => {
-    if (!expenseDetails || expenseDetails.length === 0) {
-      return [];
-    }
-    
-    return transformExpenseDetailsToGroups(expenseDetails);
-  }, [expenseDetails]);
+
   
-  // Transform grouped expenses to recent expenses format
-  const recentExpenses = React.useMemo(() => {
-    if (!groupedExpenses || groupedExpenses.length === 0) {
-      return [];
-    }
-    
-    // Take the most recent 3 grouped expenses
-    return groupedExpenses
-      .slice(0, 3)
-      .map((expense) => {
-        return {
-          id: expense.reportHeaderId,
-          title: expense.reportName || expense.title,
-          amount: expense.totalAmount,
-          status: expense.status,
-          date: expense.reportDate,
-          itemCount: expense.itemCount,
-        };
-      });
-  }, [groupedExpenses]);
+
   
-  // Calculate statistics from grouped expenses
-  const statistics = React.useMemo(() => {
-    if (!groupedExpenses || groupedExpenses.length === 0) {
-      return { total: 0, pending: 0, approved: 0, rejected: 0 };
-    }
-    
-    const total = groupedExpenses.length;
-    const pending = groupedExpenses.filter(e => e.status === 'pending').length;
-    const approved = groupedExpenses.filter(e => e.status === 'approved').length;
-    const rejected = groupedExpenses.filter(e => e.status === 'rejected').length;
-    
-    return { total, pending, approved, rejected };
-  }, [groupedExpenses]);
-  
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return colors.success;
-      case 'pending':
-        return colors.warning;
-      case 'rejected':
-        return colors.error;
-      default:
-        return colors.placeholder;
-    }
-  };
-  
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'approved':
-        return <Feather name="check-circle" size={16} color={colors.success} />;
-      case 'pending':
-        return <Feather name="clock" size={16} color={colors.warning} />;
-      case 'rejected':
-        return <Feather name="alert-circle" size={16} color={colors.error} />;
-      default:
-        return null;
-    }
-  };
-  
-  const handleCreateExpense = () => {
-    navigate('CreateExpense');
-  };
-  
-  const handleViewAllExpenses = () => {
+  const handleViewExpenses = () => {
     navigate('Expense');
   };
 
-  const handleTransactionHistory = () => {
-    // Navigate to transaction history
-    console.log('Transaction history');
+  const handleExpenseClaim = () => {
+    navigate('CreateExpense');
   };
 
-  const handleViewExpenseDetails = (id: string) => {
-    // Find the grouped expense by ReportHeaderId
-    const groupedExpense = groupedExpenses.find(expense => expense.reportHeaderId === id);
-    
-    if (groupedExpense) {
-      console.log('Navigating to expense details from HomeScreen:', groupedExpense);
-      
-      // Transform to the format expected by ExpenseDetailsScreen
-      const expenseDetail = {
-        reportHeaderId: groupedExpense.reportHeaderId,
-        reportName: groupedExpense.reportName,
-        reportDate: groupedExpense.reportDate,
-        totalAmount: groupedExpense.totalAmount,
-        currency: 'USD', // Default currency
-        status: groupedExpense.status,
-        items: groupedExpense.items,
-      };
-      
-      navigation.navigate('ExpenseDetails', { expense: expenseDetail });
-    } else {
-      console.log('Grouped expense not found for id:', id);
-    }
+  const handleTransactionHistory = () => {
+    navigate('TransactionHistory');
   };
+
+
   
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header 
-        title="Dashboard" 
+        title="Reimbursements" 
         showThemeToggle={true}
       />
       
@@ -228,195 +71,96 @@ export const HomeScreen: React.FC = () => {
           </View>
         </View>
         
-        {/* Main Modules Grid */}
-        <View style={styles.modulesGrid}>
-          {/* Create Expense Module */}
-          <TouchableOpacity 
-            style={[
-              styles.moduleTile,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.medium
-            ]}
-            onPress={handleCreateExpense}
-          >
-            <View style={styles.moduleHeader}>
-              <View style={[styles.moduleIcon, { backgroundColor: colors.primary + '15' }]}>
-                <Feather name="plus-circle" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.moduleBadge}>
-                <Text style={[styles.moduleBadgeText, { color: colors.primary }]}>
-                  NEW
+        {/* Reimbursements Section */}
+        <View style={styles.reimbursementsSection}>
+          <View style={styles.cardsContainer}>
+            {/* First Row */}
+            <View style={styles.cardRow}>
+                 
+              {/* Create Expense Card */}
+              <TouchableOpacity 
+                style={[
+                  styles.reimbursementCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  shadows.medium
+                ]}
+                onPress={handleExpenseClaim}
+              >
+                <View style={styles.cardIconContainer}>
+                  <View style={[styles.cardIcon, { backgroundColor: colors.secondary + '15' }]}>
+                    <Feather name="edit-3" size={24} color={colors.secondary} />
+                  </View>
+                </View>
+                
+                <Text style={[styles.cardTitle, { color: colors.text }]}>
+                  Expense Claim
                 </Text>
-              </View>
-            </View>
-            
-            <View style={styles.moduleContent}>
-              <Text style={[styles.moduleTitle, { color: colors.text }]}>
-                Create Expense
-              </Text>
-              <Text style={[styles.moduleDescription, { color: colors.placeholder }]}>
-                Submit new expense report
-              </Text>
-            </View>
-            
-            <View style={styles.moduleFooter}>
-              <Text style={[styles.moduleStatValue, { color: colors.text }]}>
-                5 min
-              </Text>
-              <Feather name="arrow-right" size={16} color={colors.primary} />
-            </View>
-          </TouchableOpacity>
-          
-          {/* View Expenses Module */}
-          <TouchableOpacity 
-            style={[
-              styles.moduleTile,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.medium
-            ]}
-            onPress={handleViewAllExpenses}
-          >
-            <View style={styles.moduleHeader}>
-              <View style={[styles.moduleIcon, { backgroundColor: colors.secondary + '15' }]}>
-                <Feather name="file-text" size={24} color={colors.secondary} />
-              </View>
-              <View style={[styles.moduleBadge, { backgroundColor: colors.warning + '15' }]}>
-                <Text style={[styles.moduleBadgeText, { color: colors.warning }]}>
-                  {statistics.total}
+                
+                <Text style={[styles.cardDescription, { color: colors.placeholder }]}>
+                  Create a new expense claim
                 </Text>
-              </View>
-            </View>
-            
-            <View style={styles.moduleContent}>
-              <Text style={[styles.moduleTitle, { color: colors.text }]}>
-                View Expenses
-              </Text>
-              <Text style={[styles.moduleDescription, { color: colors.placeholder }]}>
-                Browse all reports
-              </Text>
-            </View>
-            
-            <View style={styles.moduleFooter}>
-              <Text style={[styles.moduleStatValue, { color: colors.text }]}>
-                {statistics.pending} pending
-              </Text>
-              <Feather name="arrow-right" size={16} color={colors.secondary} />
-            </View>
-          </TouchableOpacity>
-          
-          {/* Transaction History Module */}
-          <TouchableOpacity 
-            style={[
-              styles.moduleTile,
-              { backgroundColor: colors.card, borderColor: colors.border },
-              shadows.medium
-            ]}
-            onPress={handleTransactionHistory}
-          >
-            <View style={styles.moduleHeader}>
-              <View style={[styles.moduleIcon, { backgroundColor: colors.success + '15' }]}>
-                <Feather name="activity" size={24} color={colors.success} />
-              </View>
-              <View style={[styles.moduleBadge, { backgroundColor: colors.success + '15' }]}>
-                <Text style={[styles.moduleBadgeText, { color: colors.success }]}>
-                  LIVE
+              </TouchableOpacity>
+              {/* Expenses Card */}
+              <TouchableOpacity 
+                style={[
+                  styles.reimbursementCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  shadows.medium
+                ]}
+                onPress={handleViewExpenses}
+              >
+                <View style={styles.cardIconContainer}>
+                  <View style={[styles.cardIcon, { backgroundColor: colors.primary + '15' }]}>
+                    <Feather name="list" size={24} color={colors.primary} />
+                  </View>
+                </View>
+                
+                <Text style={[styles.cardTitle, { color: colors.text }]}>
+                  Expenses
                 </Text>
-              </View>
+                
+                <Text style={[styles.cardDescription, { color: colors.placeholder }]}>
+                  List of your expenses
+                </Text>
+              </TouchableOpacity>
+           
             </View>
             
-            <View style={styles.moduleContent}>
-              <Text style={[styles.moduleTitle, { color: colors.text }]}>
-                History
-              </Text>
-              <Text style={[styles.moduleDescription, { color: colors.placeholder }]}>
-                View transaction logs
-              </Text>
+            {/* Second Row */}
+            <View style={styles.cardRow}>
+              {/* Transaction History Card */}
+              <TouchableOpacity 
+                style={[
+                  styles.reimbursementCard,
+                  { backgroundColor: colors.card, borderColor: colors.border },
+                  shadows.medium
+                ]}
+                onPress={handleTransactionHistory}
+              >
+                <View style={styles.cardIconContainer}>
+                  <View style={[styles.cardIcon, { backgroundColor: colors.success + '15' }]}>
+                    <Feather name="activity" size={24} color={colors.success} />
+                  </View>
+                </View>
+                
+                <Text style={[styles.cardTitle, { color: colors.text }]}>
+                  Transaction History
+                </Text>
+                
+                <Text style={[styles.cardDescription, { color: colors.placeholder }]}>
+                  View recent activity
+                </Text>
+              </TouchableOpacity>
+              
+              {/* Empty space to maintain card size */}
+              <View style={styles.reimbursementCard} />
             </View>
-            
-            <View style={styles.moduleFooter}>
-              <Text style={[styles.moduleStatValue, { color: colors.text }]}>
-                {statistics.total} total
-              </Text>
-              <Feather name="arrow-right" size={16} color={colors.success} />
-            </View>
-          </TouchableOpacity>
+          </View>
         </View>
         
 
         
-        {/* Recent Expenses Section */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Recent Expenses
-            </Text>
-            <TouchableOpacity 
-              style={styles.viewAllButton}
-              onPress={handleViewAllExpenses}
-            >
-              <Text style={[styles.viewAllText, { color: colors.primary }]}>
-                View All
-              </Text>
-              <Feather name="arrow-right" size={16} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-          
-          {loading ? (
-            <View style={[styles.loadingContainer, { backgroundColor: colors.card }]}>
-              <Text style={[styles.loadingText, { color: colors.placeholder }]}>
-                Loading expenses...
-              </Text>
-            </View>
-          ) : recentExpenses.length > 0 ? (
-            recentExpenses.map((expense) => (
-              <TouchableOpacity
-                key={expense.id}
-                style={[
-                  styles.expenseCard,
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  shadows.small
-                ]}
-                onPress={() => handleViewExpenseDetails(expense.id)}
-              >
-                <View style={styles.expenseCardContent}>
-                  <View style={styles.expenseHeader}>
-                    <View style={styles.expenseInfo}>
-                      <Text style={[styles.expenseTitle, { color: colors.text }]} numberOfLines={1}>
-                        {expense.title}
-                      </Text>
-                      <Text style={[styles.expenseDate, { color: colors.placeholder }]}>
-                        {formatTransactionDate(expense.date)}
-                      </Text>
-                      {/* Removed businessPurpose and location as they are not in the new grouped structure */}
-                    </View>
-                    <View style={[
-                      styles.statusChip,
-                      { backgroundColor: getStatusColor(expense.status) + '15' }
-                    ]}>
-                      {getStatusIcon(expense.status)}
-                      <Text style={[styles.statusText, { color: getStatusColor(expense.status) }]}>
-                        {expense.status.charAt(0).toUpperCase() + expense.status.slice(1)}
-                      </Text>
-                    </View>
-                  </View>
-                  
-                  <View style={styles.expenseFooter}>
-                    <Text style={[styles.expenseAmount, { color: colors.text }]}>
-                      ${expense.amount.toFixed(2)}
-                    </Text>
-                    <Feather name="arrow-right" size={16} color={colors.placeholder} />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={[styles.emptyContainer, { backgroundColor: colors.card }]}>
-              <Text style={[styles.emptyText, { color: colors.placeholder }]}>
-                No recent expenses found
-              </Text>
-            </View>
-          )}
-        </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -430,7 +174,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: SIZES.padding,
+    paddingHorizontal: SIZES.padding,
+    paddingTop: 8, // Reduced from SIZES.padding (16) to 8
     paddingBottom: 40,
   },
   welcomeSection: {
@@ -457,6 +202,48 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  reimbursementsSection: {
+    marginBottom: SIZES.padding,
+  },
+  cardsContainer: {
+    gap: SIZES.padding,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: SIZES.padding,
+  },
+  reimbursementCard: {
+    flex: 1,
+    padding: SIZES.padding,
+    borderRadius: SIZES.radius,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 140,
+    aspectRatio: 1.2,
+  },
+  cardIconContainer: {
+    marginBottom: SIZES.padding,
+  },
+  cardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: {
+    fontSize: SIZES.medium,
+    fontWeight: '600',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  cardDescription: {
+    fontSize: SIZES.small,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   modulesGrid: {
     flexDirection: 'row',

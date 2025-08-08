@@ -64,9 +64,14 @@ export const apiRequest = async <T = unknown>(
   data?: unknown,
   requiresAuth = true,
 ): Promise<T> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  
   try {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'ExpenseApp/1.0',
     };
 
     if (requiresAuth) {
@@ -81,16 +86,20 @@ export const apiRequest = async <T = unknown>(
       method,
       headers,
       body: data ? JSON.stringify(data) : undefined,
+      signal: controller.signal,
     };
 
-    logger.debug('Making API request', {
-      url: `${BASE_URL}${endpoint}`,
+    const fullUrl = `${BASE_URL}${endpoint}`;
+    logger.info('Making API request', {
+      url: fullUrl,
       method,
-      headers,
-      body: data,
+      headers: { ...headers, Authorization: headers.Authorization ? '[HIDDEN]' : undefined },
+      bodyData: data,
+      timeout: '30s'
     });
 
-    const response = await fetch(`${BASE_URL}${endpoint}`, config);
+    const response = await fetch(fullUrl, config);
+    clearTimeout(timeoutId);
 
     // Check if response is JSON by checking content-type header
     const contentType = response.headers.get('content-type');
@@ -118,7 +127,33 @@ export const apiRequest = async <T = unknown>(
 
     return responseData;
   } catch (error) {
-    logger.error('API request error', { error, endpoint, method });
+    clearTimeout(timeoutId);
+    
+    // Handle different types of network errors
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        logger.error('API request timeout', { endpoint, method, timeout: '30s' });
+        throw new Error('Request timeout. Please check your internet connection and try again.');
+      } else if (error.message.includes('Network request failed') || error.message.includes('Failed to fetch')) {
+        logger.error('Network error', { error: error.message, endpoint, method });
+        throw new Error('Network error. Please check your internet connection.');
+      } else if (error.message.includes('getaddrinfo ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
+        logger.error('Connection error', { error: error.message, endpoint, method });
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else if (error.message.includes('SSL') || error.message.includes('certificate')) {
+        logger.error('SSL/Certificate error', { error: error.message, endpoint, method });
+        throw new Error('Secure connection error. Please try again.');
+      }
+    }
+    
+    logger.error('API request error', { 
+      error, 
+      errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      errorType: typeof error,
+      endpoint, 
+      method,
+      baseUrl: BASE_URL
+    });
     throw error;
   }
 };
@@ -126,53 +161,87 @@ export const apiRequest = async <T = unknown>(
 // Auth API
 export const authAPI = {
   login: async (username: string, password: string): Promise<ApiResponse<LoginResponse>> => {
-    const loginData: LoginRequest = {
-      username,
-      password,
-      isSSO: 'N',
-    };
+    try {
+      const loginData: LoginRequest = {
+        username,
+        password,
+        isSSO: 'N',
+      };
 
-    const response = await apiRequest<ApiResponse<LoginResponse>>('/20D/login', 'POST', loginData, false);
-
-    // Check if we have data and the first item has STATUS
-    if (response.data && response.data.length > 0) {
-      const loginData = response.data[0] as LoginResponse;
+      logger.info('Attempting login', { username, endpoint: '/20D/login' });
+      const response = await apiRequest<ApiResponse<LoginResponse>>('/20D/login', 'POST', loginData, false);
       
-      // Check if login was successful (STATUS = '1' means success, '0' means failure)
-      if (loginData.STATUS === '1') {
-        // Store user data in AsyncStorage
-        const userData = {
-          username: loginData.USER_NAME,
-          userId: loginData.USER_ID,
-          fullName: loginData.FULL_NAME,
-          personId: loginData.PERSON_ID,
-          responsibility: loginData.RESPONSIBILITY,
-          defaultOrgId: loginData.DEFAULT_ORG_ID,
-          defaultOrgName: loginData.DEFAULT_OU_NAME,
-          defaultInvOrgId: loginData.DEFAULT_INV_ORG_ID,
-          defaultInvOrgName: loginData.DEFAULT_INV_ORG_NAME,
-          defaultInvOrgCode: loginData.DEFAULT_INV_ORG_CODE,
-          responsibilityId: loginData.RESPONSIBILITY_ID,
-          respApplicationId: loginData.RESP_APPLICATION_ID,
-          timestamp: loginData.TIMESTAMP,
-          timezoneOffset: loginData.TIMEZONE_OFFSET,
-        };
+      logger.info('Login API response received', { 
+        hasData: !!response.data, 
+        dataLength: response.data?.length,
+        responseKeys: Object.keys(response || {}),
+        fullResponse: response
+      });
+
+      // Check if we have data and the first item has STATUS
+      if (response.data && response.data.length > 0) {
+        const loginResponseData = response.data[0] as LoginResponse;
+        logger.info('Login response data', { 
+          status: loginResponseData.STATUS,
+          username: loginResponseData.USER_NAME,
+          responseDataKeys: Object.keys(loginResponseData)
+        });
         
-        await AsyncStorage.setItem('user', JSON.stringify(userData));
-        await AsyncStorage.setItem('authToken', 'authenticated'); // Store a token indicator
-        
-        return {
-          ...response,
-          success: true,
-          user: userData,
-        };
+        // Check if login was successful (STATUS = '1' means success, '0' means failure)
+        if (loginResponseData.STATUS === '1') {
+          // Store user data in AsyncStorage
+          const userData = {
+            username: loginResponseData.USER_NAME,
+            userId: loginResponseData.USER_ID,
+            fullName: loginResponseData.FULL_NAME,
+            personId: loginResponseData.PERSON_ID,
+            responsibility: loginResponseData.RESPONSIBILITY,
+            defaultOrgId: loginResponseData.DEFAULT_ORG_ID,
+            defaultOrgName: loginResponseData.DEFAULT_OU_NAME,
+            defaultInvOrgId: loginResponseData.DEFAULT_INV_ORG_ID,
+            defaultInvOrgName: loginResponseData.DEFAULT_INV_ORG_NAME,
+            defaultInvOrgCode: loginResponseData.DEFAULT_INV_ORG_CODE,
+            responsibilityId: loginResponseData.RESPONSIBILITY_ID,
+            respApplicationId: loginResponseData.RESP_APPLICATION_ID,
+            timestamp: loginResponseData.TIMESTAMP,
+            timezoneOffset: loginResponseData.TIMEZONE_OFFSET,
+          };
+          
+          await AsyncStorage.setItem('user', JSON.stringify(userData));
+          await AsyncStorage.setItem('authToken', 'authenticated'); // Store a token indicator
+          
+          logger.info('Login successful, user data stored');
+          return {
+            ...response,
+            success: true,
+            user: userData,
+          };
+        } else {
+          // Login failed - log the actual status and any additional info
+          logger.error('Login failed - invalid credentials', { 
+            status: loginResponseData.STATUS,
+            username: username,
+            responseData: loginResponseData 
+          });
+          throw new Error('Invalid username or password.');
+        }
       } else {
-        // Login failed
-        throw new Error('Invalid username or password.');
+        // No data returned
+        logger.error('Login failed - no data in response', { 
+          response: response,
+          username: username 
+        });
+        throw new Error('Login failed. Server returned no data.');
       }
-    } else {
-      // No data returned
-      throw new Error('Login failed. Please try again.');
+    } catch (error) {
+      logger.error('Login API error', { 
+        error: error,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorType: typeof error,
+        username: username,
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw error;
     }
   },
 
@@ -299,6 +368,94 @@ export async function fetchApi(apiInfo: ApiInfo): Promise<unknown> {
     throw error;
   }
 }
+
+// Receipt Extraction API
+export const receiptExtractionAPI = {
+  extractReceiptDetails: async (base64Image: string): Promise<{
+    business_name: string;
+    items: Array<{
+      description: string;
+      price: number;
+    }>;
+  }> => {
+    try {
+      const endpoint = 'https://testnode.propelapps.com/25B/extractReceiptDetails';
+      
+      logger.info('Calling receipt extraction API');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for image processing
+      
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'ExpenseApp/1.0',
+          },
+          body: JSON.stringify({
+            base64Image: base64Image
+          }),
+          signal: controller.signal,
+        });
+        
+        clearTimeout(timeoutId);
+        
+        logger.info('Receipt extraction API response status:', { 
+          status: response.status, 
+          statusText: response.statusText 
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          logger.error('Receipt extraction API error response:', errorText);
+          throw new Error(`Receipt extraction failed: ${response.status} - ${response.statusText}`);
+        }
+
+        const responseText = await response.text();
+        logger.info('Receipt extraction API raw response text:', responseText);
+        
+        if (!responseText || responseText.trim() === '') {
+          logger.warn('Empty response from receipt extraction API');
+          throw new Error('No data received from receipt extraction service');
+        }
+
+        // Try to parse JSON
+        let data;
+        try {
+          data = JSON.parse(responseText);
+          logger.info('Receipt extraction API parsed response:', { data });
+        } catch (parseError) {
+          logger.error('JSON parse error for receipt extraction API:', {
+            responseText,
+            parseError
+          });
+          throw new Error(`Invalid response from receipt extraction service: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
+        }
+
+        // Validate response structure
+        if (!data.business_name || !Array.isArray(data.items)) {
+          logger.error('Invalid response structure from receipt extraction API:', data);
+          throw new Error('Invalid response structure from receipt extraction service. Expected business_name and items array.');
+        }
+
+        return data;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        if (error instanceof Error && error.name === 'AbortError') {
+          logger.error('Receipt extraction API request timed out');
+          throw new Error('Receipt extraction timed out after 60 seconds');
+        }
+        logger.error('Error extracting receipt details:', error);
+        throw error;
+      }
+    } catch (error) {
+      logger.error('Error extracting receipt details:', error);
+      throw error;
+    }
+  },
+};
 
 export const attachmentAPI = {
   getAttachments: async (lineId?: string) => {

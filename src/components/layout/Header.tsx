@@ -33,8 +33,8 @@ export const Header = ({
     <View style={[
       styles.container, 
       { 
-        backgroundColor: colors.card, 
-        borderBottomColor: colors.border,
+        backgroundColor: colors.primary, 
+        borderBottomColor: colors.primary,
         paddingTop: Platform.OS === 'ios' ? 44 : 10, // Account for status bar
       }
     ]}>
@@ -46,12 +46,12 @@ export const Header = ({
               onPress={handleBack}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Feather name="arrow-left" size={24} color={colors.primary} />
+              <Feather name="arrow-left" size={24} color={colors.white} />
             </TouchableOpacity>
           )}
         </View>
         
-        <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+        <Text style={[styles.title, { color: colors.white }]} numberOfLines={1}>
           {title}
         </Text>
         
@@ -62,11 +62,11 @@ export const Header = ({
               onPress={toggleTheme}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              {isDark ? (
-                <Feather name="sun" size={24} color={colors.primary} />
-              ) : (
-                <Feather name="moon" size={24} color={colors.primary} />
-              )}
+                          {isDark ? (
+              <Feather name="sun" size={24} color={colors.white} />
+            ) : (
+              <Feather name="moon" size={24} color={colors.white} />
+            )}
             </TouchableOpacity>
           )}
           

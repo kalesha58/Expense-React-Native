@@ -5,7 +5,7 @@ export const COLORS = {
   light: {
     primary: '#1E3A8A', // Oracle blue
     secondary: '#7A86B8', // Soft purple
-    background: '#F5F7FA',
+    background: '#F8FAFC', // Softer, more comfortable background
     card: '#FFFFFF',
     text: '#333333',
     textLight: '#9A8478', // Added for login UI

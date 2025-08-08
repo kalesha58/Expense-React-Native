@@ -17,7 +17,7 @@ import Feather from 'react-native-vector-icons/Feather';
 import { replace } from '../utils/NavigationUtils';
 import { logger } from '../utils/logger';
 
-const VERSION = 'EXP2025A-V1.0.0';
+const VERSION = 'EXP25A-V1.0.3';
 
 interface LoginFormData {
   username: string;
@@ -33,11 +33,11 @@ const LoginScreen: React.FC = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoginLoading, setIsLoginLoading] = useState(false);
+  const [isDemoLoading, setIsDemoLoading] = useState(false);
 
   const handleInputChange = (field: keyof LoginFormData, value: string): void => {
     setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
     if (error) {
       setError('');
     }
@@ -57,29 +57,27 @@ const LoginScreen: React.FC = () => {
 
   const handleLogin = async (): Promise<void> => {
     if (!validateForm()) return;
-
     setError('');
-    setIsLoading(true);
-    
+    setIsLoginLoading(true);
+
     try {
       logger.info('Login attempt', { username: formData.username });
-      
-      // Add timeout to prevent hanging
       const loginPromise = login(formData.username, formData.password);
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Request timeout. Please try again.')), 30000)
       );
-      
-      // Call the actual login API through AuthContext with timeout
       await Promise.race([loginPromise, timeoutPromise]);
-      
       logger.info('Login successful, navigating to department screen');
-      // Navigate to department screen after successful authentication
       await replace('SelectDepartment');
     } catch (error) {
-      logger.error('Login failed', { error, username: formData.username });
+      logger.error('Login failed', { 
+        error, 
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        errorType: typeof error,
+        username: formData.username,
+        stack: error instanceof Error ? error.stack : undefined
+      });
       
-      // Handle different types of errors
       if (error instanceof Error) {
         if (error.message.includes('timeout')) {
           setError('Request timeout. Please check your internet connection and try again.');
@@ -89,34 +87,36 @@ const LoginScreen: React.FC = () => {
           setError('Invalid username or password.');
         } else if (error.message.includes('500') || error.message.includes('Server')) {
           setError('Server error. Please try again later.');
+        } else if (error.message.includes('Invalid username or password')) {
+          setError('Invalid username or password. Please check your credentials.');
+        } else if (error.message.includes('Server returned no data')) {
+          setError('Server error. Please try again later.');
         } else {
           setError(error.message || 'Login failed. Please try again.');
         }
       } else {
+        logger.error('Non-Error object caught in login', { error, errorType: typeof error });
         setError('An unexpected error occurred. Please try again.');
       }
     } finally {
-      setIsLoading(false);
+      setIsLoginLoading(false);
     }
   };
 
   const handleDemo = async (): Promise<void> => {
     setError('');
-    setIsLoading(true);
-    
+    setIsDemoLoading(true);
+
     try {
       logger.info('Demo login attempt');
-      
-      // Use demo credentials
       await login('demo@propelapps.com', 'demo123');
-      
       logger.info('Demo login successful, navigating to department screen');
       await replace('SelectDepartment');
     } catch (error) {
       logger.error('Demo login failed', { error });
       setError('Demo login failed. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsDemoLoading(false);
     }
   };
 
@@ -137,16 +137,13 @@ const LoginScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.container}>
-          {/* Header */}
+          {/* Header Section */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Mobile Expenses</Text>
+            <Text style={styles.appTitle}>Expense App</Text>
           </View>
 
           {/* Main Content */}
           <View style={styles.content}>
-            {/* Login Title */}
-            <Text style={styles.loginTitle}>Login</Text>
-
             {/* Error Box */}
             {error ? (
               <View style={styles.errorBox}>
@@ -158,81 +155,94 @@ const LoginScreen: React.FC = () => {
               </View>
             ) : null}
 
-            {/* Email Input */}
-            <View style={styles.inputContainer}>
-              <Feather name="user" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
+            {/* Form Section */}
+            <View style={styles.formContainer}>
+              {/* Username Input */}
+              <View
                 style={[
-                  styles.input,
-                  styles.inputWithIcon,
+                  styles.inputContainer,
                   error.toLowerCase().includes('username') && styles.inputError,
                 ]}
-                autoCapitalize="none"
-                value={formData.username}
-                placeholder="demo@propelapps.com"
-                placeholderTextColor="#999"
-                onChangeText={(value) => handleInputChange('username', value)}
-                editable={!isLoading}
-              />
-            </View>
+              >
+                <View style={styles.inputIconContainer}>
+                  <Feather name="user" size={20} color="#09658A" />
+                </View>
+                <TextInput
+                  style={styles.input}
+                  autoCapitalize="none"
+                  value={formData.username}
+                  placeholder="Username"
+                  placeholderTextColor="#9CA3AF"
+                  onChangeText={(value) => handleInputChange('username', value)}
+                  editable={!isLoginLoading && !isDemoLoading}
+                />
+              </View>
 
-            {/* Password Input */}
-            <View style={styles.passwordContainer}>
-              <Feather name="lock" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
+              {/* Password Input */}
+              <View
                 style={[
-                  styles.input,
-                  styles.inputWithIcon,
-                  styles.passwordInput,
+                  styles.inputContainer,
                   error.toLowerCase().includes('password') && styles.inputError,
                 ]}
-                value={formData.password}
-                placeholder="Enter Password"
-                placeholderTextColor="#999"
-                secureTextEntry={!showPassword}
-                onChangeText={(value) => handleInputChange('password', value)}
-                editable={!isLoading}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.passwordToggle}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                disabled={isLoading}
               >
-                {showPassword ? (
-                  <Feather name="eye-off" size={20} color="#666" />
-                ) : (
-                  <Feather name="eye" size={20} color="#666" />
-                )}
-              </TouchableOpacity>
+                <View style={styles.inputIconContainer}>
+                  <Feather name="lock" size={20} color="#09658A" />
+                </View>
+                <TextInput
+                  style={[styles.input, styles.passwordInput]}
+                  value={formData.password}
+                  placeholder="Password"
+                  placeholderTextColor="#9CA3AF"
+                  secureTextEntry={!showPassword}
+                  onChangeText={(value) => handleInputChange('password', value)}
+                  editable={!isLoginLoading && !isDemoLoading}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  style={styles.passwordToggle}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  disabled={isLoginLoading || isDemoLoading}
+                >
+                  <Feather
+                    name={showPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color="#09658A"
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Buttons */}
+              <View style={styles.buttonContainer}>
+                {/* Login Button */}
+                <TouchableOpacity
+                  style={[styles.loginButton, isLoginLoading && styles.buttonDisabled]}
+                  onPress={handleLogin}
+                  disabled={isLoginLoading || isDemoLoading}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.loginButtonText}>
+                    {isLoginLoading ? 'LOGGING IN...' : 'LOGIN'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Demo Button */}
+                <TouchableOpacity
+                  style={[styles.demoButton, isDemoLoading && styles.buttonDisabled]}
+                  onPress={handleDemo}
+                  disabled={isLoginLoading || isDemoLoading}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.demoButtonText}>
+                    {isDemoLoading ? 'LOADING...' : 'DEMO'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-
-            {/* Login Button */}
-            <TouchableOpacity
-              style={[styles.loginButton, isLoading && styles.buttonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-            >
-              <Text style={styles.loginButtonText}>
-                {isLoading ? 'Logging in...' : 'Login'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Demo Button */}
-            <TouchableOpacity
-              style={[styles.demoButton, isLoading && styles.buttonDisabled]}
-              onPress={handleDemo}
-              disabled={isLoading}
-            >
-              <Text style={styles.demoButtonText}>
-                {isLoading ? 'Loading...' : 'Demo'}
-              </Text>
-            </TouchableOpacity>
           </View>
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text style={styles.versionText}>Version - {VERSION}</Text>
+            <Text style={styles.versionText}>Version - Propel.{VERSION}</Text>
             <View style={styles.logoContainer}>
               <Image
                 source={require('../assets/images/Propel-Apps-Logo.png')}
@@ -251,130 +261,160 @@ const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: '#F5F5F5',
+      backgroundColor: '#F8FAFC',
     },
     keyboardAvoidingView: {
       flex: 1,
     },
     container: {
       flex: 1,
-      backgroundColor: '#F5F5F5',
+      backgroundColor: '#F8FAFC',
     },
     header: {
-      backgroundColor: '#1E3A8A',
-      paddingVertical: 16,
+      paddingTop: 60,
+      paddingHorizontal: 20,
       alignItems: 'center',
-      justifyContent: 'center',
     },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: '600',
-      color: '#FFFFFF',
+    appTitle: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: '#09658A',
+      textAlign: 'center',
+      letterSpacing: 0.5,
     },
     content: {
       flex: 1,
-      padding: 24,
+      paddingHorizontal: 20,
       justifyContent: 'center',
     },
-    loginTitle: {
-      fontSize: 24,
-      fontWeight: '600',
-      color: '#333',
-      marginBottom: 24,
-    },
-    input: {
-      borderRadius: 8,
-      padding: 16,
-      marginBottom: 16,
-      borderWidth: 1,
-      fontSize: 16,
+    formContainer: {
       width: '100%',
-      backgroundColor: '#FFFFFF',
-      borderColor: '#E5E5E5',
-      color: '#333',
-    },
-    inputError: {
-      borderColor: '#EF4444',
+      maxWidth: 400,
+      alignSelf: 'center',
     },
     inputContainer: {
       width: '100%',
-      position: 'relative',
-      marginBottom: 16,
       flexDirection: 'row',
       alignItems: 'center',
+      marginBottom: 16,
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#E5E7EB',
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 1,
+      },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
     },
-    inputWithIcon: {
-      paddingLeft: 48,
+    inputIconContainer: {
+      width: 50,
+      height: 50,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
-    inputIcon: {
-      position: 'absolute',
-      left: 16,
-      top: '50%',
-      transform: [{ translateY: -10 }],
-      zIndex: 1,
-      width: 20,
-      height: 20,
-    },
-    passwordContainer: {
-      width: '100%',
-      position: 'relative',
-      marginBottom: 24,
+    input: {
+      flex: 1,
+      paddingVertical: 15,
+      paddingRight: 16,
+      fontSize: 16,
+      color: '#374151',
+      backgroundColor: 'transparent',
     },
     passwordInput: {
-      paddingRight: 48,
+      paddingRight: 50,
+    },
+    inputError: {
+      borderColor: '#EF4444',
+      borderWidth: 1.5,
     },
     passwordToggle: {
       position: 'absolute',
       right: 16,
-      top: '50%',
-      transform: [{ translateY: -10 }],
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    buttonContainer: {
+      marginTop: 24,
+      gap: 16,
     },
     loginButton: {
-      borderRadius: 8,
-      padding: 16,
-      alignItems: 'center',
-      marginBottom: 12,
       width: '100%',
-      backgroundColor: colors.button,
+      borderRadius: 12,
+      paddingVertical: 12,
+      alignItems: 'center',
+      backgroundColor: colors.button || '#09658A',
+      shadowColor: '#09658A',
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
     },
     loginButtonText: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: '600',
       color: '#FFFFFF',
+      letterSpacing: 1,
     },
     demoButton: {
-      borderRadius: 8,
-      padding: 16,
-      alignItems: 'center',
       width: '100%',
+      borderRadius: 12,
+      paddingVertical: 6,
+      alignItems: 'center',
       backgroundColor: '#FFFFFF',
       borderWidth: 2,
-      borderColor: '#1E3A8A',
+      borderColor: '#09658A',
+      shadowColor: '#000',
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
     },
     demoButtonText: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: '600',
-      color: '#1E3A8A',
+      color: '#09658A',
+      letterSpacing: 1,
     },
     buttonDisabled: {
-      opacity: 0.7,
+      opacity: 0.6,
     },
     errorBox: {
-      padding: 12,
-      borderRadius: 8,
-      borderLeftWidth: 4,
-      marginBottom: 16,
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 20,
       flexDirection: 'row',
       alignItems: 'center',
       width: '100%',
-      backgroundColor: '#FFE5E5',
+      backgroundColor: '#FEE2E2',
+      borderLeftWidth: 4,
       borderLeftColor: '#EF4444',
+      shadowColor: '#EF4444',
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
     },
     errorText: {
-      marginLeft: 8,
+      marginLeft: 12,
       flex: 1,
       fontSize: 14,
-      color: '#333',
+      color: '#991B1B',
+      fontWeight: '500',
     },
     footer: {
       padding: 24,
@@ -382,8 +422,10 @@ const createStyles = (colors: any, isDark: boolean) =>
     },
     versionText: {
       fontSize: 12,
-      color: '#999',
+      color: '#000000',
       marginBottom: 16,
+      textAlign: 'center',
+      fontWeight: '500',
     },
     logoContainer: {
       alignItems: 'center',
@@ -391,8 +433,9 @@ const createStyles = (colors: any, isDark: boolean) =>
     },
     logoImage: {
       width: 120,
-      height: 60,
+      height: 40,
+      marginBottom: 8,
     },
   });
 
-export default LoginScreen; 
+export default LoginScreen;

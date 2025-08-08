@@ -11,6 +11,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import AccountScreen from '../screens/AccountScreen';
 import { CreateExpenseScreen } from '../screens/CreateExpenseScreen';
 import { ExpenseDetailsScreen } from '../screens/ExpenseDetailsScreen';
+import { LineItemEntryScreen } from '../screens/LineItemEntryScreen';
 import { navigationRef } from '../utils/NavigationUtils';
 import { ExpenseDetail } from '../hooks/useExpenseDetails';
 
@@ -24,6 +25,11 @@ export type RootStackParamList = {
   Profile: undefined;
   Account: undefined;
   CreateExpense: undefined;
+  LineItemEntry: {
+    onSave?: (lineItem: any) => void;
+    editMode?: boolean;
+    lineItem?: any;
+  };
   ExpenseDetails: { 
     expense: {
       reportHeaderId: string;
@@ -35,6 +41,7 @@ export type RootStackParamList = {
       items: ExpenseDetail[];
     };
   };
+
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -57,6 +64,7 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="Account" component={AccountScreen} />
         <Stack.Screen name="CreateExpense" component={CreateExpenseScreen} />
+        <Stack.Screen name="LineItemEntry" component={LineItemEntryScreen} />
         <Stack.Screen name="ExpenseDetails" component={ExpenseDetailsScreen} />
       </Stack.Navigator>
     </NavigationContainer>

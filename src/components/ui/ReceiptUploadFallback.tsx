@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -6,12 +6,12 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Alert, 
+  Modal,
   Dimensions,
   Platform,
   ActivityIndicator
 } from 'react-native';
 import Feather from 'react-native-vector-icons/Feather';
-import { BottomSheetModal, BottomSheetView, BottomSheetBackdrop } from '@gorhom/bottom-sheet';
 import { launchCamera, launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import { useTheme } from '../../hooks/useTheme';
 import { SIZES } from '../../constants/theme';
@@ -24,7 +24,7 @@ interface ReceiptFile {
   mimeType?: string;
 }
 
-interface ReceiptUploadProps {
+interface ReceiptUploadFallbackProps {
   value: ReceiptFile[];
   onChange: (files: ReceiptFile[]) => void;
   label?: string;
@@ -39,66 +39,20 @@ interface ReceiptUploadProps {
 
 const { width: screenWidth } = Dimensions.get('window');
 
-export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({ 
+export const ReceiptUploadFallback: React.FC<ReceiptUploadFallbackProps> = ({ 
   value = [], 
   onChange, 
   label = 'Receipts',
   onExtractionComplete
 }) => {
   const { colors } = useTheme();
-  const bottomSheetModalRef = useRef<BottomSheetModal>(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   
   // Debug isExtracting state changes
   React.useEffect(() => {
-    console.log('isExtracting state changed to:', isExtracting);
+    console.log('isExtracting state changed to (fallback):', isExtracting);
   }, [isExtracting]);
-
-  // Variables for bottom sheet
-  const snapPoints = useMemo(() => ['25%', '50%'], []);
-
-  // Callbacks for bottom sheet
-  const handlePresentModalPress = useCallback(() => {
-    try {
-      bottomSheetModalRef.current?.present();
-    } catch (error) {
-      console.error('Error presenting bottom sheet:', error);
-      // Fallback to alert if bottom sheet fails
-      Alert.alert(
-        'Upload Options',
-        'Choose an option:',
-        [
-          { text: 'Camera', onPress: () => Alert.alert('Info', 'Camera functionality temporarily disabled') },
-          { text: 'Gallery', onPress: () => Alert.alert('Info', 'Gallery functionality temporarily disabled') },
-          { text: 'Document', onPress: () => Alert.alert('Info', 'Document picker functionality temporarily disabled') },
-          { text: 'Cancel', style: 'cancel' }
-        ]
-      );
-    }
-  }, []);
-
-  const handleDismiss = useCallback(() => {
-    try {
-      bottomSheetModalRef.current?.dismiss();
-    } catch (error) {
-      console.error('Error dismissing bottom sheet:', error);
-    }
-  }, []);
-
-  const handleSheetChanges = useCallback((index: number) => {
-    console.log('handleSheetChanges', index);
-  }, []);
-
-  const renderBackdrop = useCallback(
-    (props: any) => (
-      <BottomSheetBackdrop
-        {...props}
-        disappearsOnIndex={-1}
-        appearsOnIndex={0}
-      />
-    ),
-    []
-  );
 
   // Image picker configuration
   const imagePickerOptions = {
@@ -109,75 +63,9 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
     quality: 0.8,
   };
 
-  // Extract receipt details from image
-  const extractReceiptDetails = useCallback(async (fileUri: string) => {
-    try {
-      console.log('Starting extraction process for:', fileUri);
-      setIsExtracting(true);
-      console.log('isExtracting set to true');
-      
-      // Show initial alert to user
-      Alert.alert(
-        'Processing Receipt',
-        'Starting receipt extraction. This may take up to 60 seconds.',
-        [{ text: 'OK' }]
-      );
-      
-      // Validate file format
-      if (!isSupportedImageFormat(fileUri)) {
-        console.log('Unsupported file format:', fileUri);
-        Alert.alert('Unsupported Format', 'Please select a supported image format (JPG, PNG, GIF, WebP)');
-        return;
-      }
-      
-      console.log('File format validation passed');
-      
-      // Check file size
-      const isAcceptableSize = await isFileSizeAcceptable(fileUri);
-      if (!isAcceptableSize) {
-        console.log('File size too large');
-        Alert.alert('File Too Large', 'Please select an image smaller than 10MB');
-        return;
-      }
-      
-      console.log('File size validation passed');
-      
-      // Convert to base64
-      console.log('Converting image to base64...');
-      const base64Result = await convertImageToBase64(fileUri);
-      console.log('Base64 conversion completed, length:', base64Result.base64.length);
-      
-      // Call extraction API
-      console.log('Calling receipt extraction API...');
-      const extractionResult = await receiptExtractionAPI.extractReceiptDetails(base64Result.base64);
-      console.log('Extraction API response:', extractionResult);
-      
-      // Call the callback with extraction results
-      if (onExtractionComplete) {
-        console.log('Calling onExtractionComplete callback');
-        onExtractionComplete(extractionResult);
-      }
-      
-      Alert.alert(
-        'Receipt Extracted!', 
-        `Successfully extracted data from receipt:\n\nBusiness: ${extractionResult.business_name}\nItems: ${extractionResult.items.length} found`
-      );
-      
-    } catch (error) {
-      console.error('Receipt extraction error:', error);
-      Alert.alert(
-        'Extraction Failed', 
-        error instanceof Error ? error.message : 'Failed to extract receipt details. Please try again.'
-      );
-    } finally {
-      console.log('Setting isExtracting to false');
-      setIsExtracting(false);
-    }
-  }, [onExtractionComplete]);
-
   // Handle image picker response
   const handleImagePickerResponse = useCallback((response: ImagePickerResponse) => {
-    console.log('Image picker response:', response);
+    console.log('Image picker response (fallback):', response);
     
     if (response.didCancel || response.errorMessage) {
       if (response.errorMessage) {
@@ -193,17 +81,17 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
         mimeType: asset.type || 'image/jpeg',
       })).filter(file => file.uri !== '');
 
-      console.log('New files to add:', newFiles);
+      console.log('New files to add (fallback):', newFiles);
 
       if (newFiles.length > 0) {
         onChange([...value, ...newFiles]);
         
         // Automatically extract from the first image if extraction callback is provided
         if (onExtractionComplete && newFiles.length > 0) {
-          console.log('Starting receipt extraction for:', newFiles[0].uri);
+          console.log('Starting receipt extraction for (fallback):', newFiles[0].uri);
           extractReceiptDetails(newFiles[0].uri);
         } else {
-          console.log('No extraction callback provided or no files to extract');
+          console.log('No extraction callback provided or no files to extract (fallback)');
         }
       }
     }
@@ -211,24 +99,90 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
 
   // Camera functionality
   const handleTakePhoto = useCallback(() => {
-    handleDismiss();
+    setIsModalVisible(false);
     
     launchCamera(imagePickerOptions, handleImagePickerResponse);
-  }, [handleImagePickerResponse, handleDismiss]);
+  }, [handleImagePickerResponse]);
 
   // Gallery functionality
   const handlePickImage = useCallback(() => {
-    handleDismiss();
+    setIsModalVisible(false);
     
     launchImageLibrary({
       ...imagePickerOptions,
       selectionLimit: 5, // Allow multiple selection
     }, handleImagePickerResponse);
-  }, [handleImagePickerResponse, handleDismiss]);
+  }, [handleImagePickerResponse]);
+
+  // Extract receipt details from image
+  const extractReceiptDetails = useCallback(async (fileUri: string) => {
+    try {
+      console.log('Starting extraction process for (fallback):', fileUri);
+      setIsExtracting(true);
+      console.log('isExtracting set to true (fallback)');
+      
+      // Show initial alert to user
+      Alert.alert(
+        'Processing Receipt',
+        'Starting receipt extraction. This may take up to 60 seconds.',
+        [{ text: 'OK' }]
+      );
+      
+      // Validate file format
+      if (!isSupportedImageFormat(fileUri)) {
+        console.log('Unsupported file format (fallback):', fileUri);
+        Alert.alert('Unsupported Format', 'Please select a supported image format (JPG, PNG, GIF, WebP)');
+        return;
+      }
+      
+      console.log('File format validation passed (fallback)');
+      
+      // Check file size
+      const isAcceptableSize = await isFileSizeAcceptable(fileUri);
+      if (!isAcceptableSize) {
+        console.log('File size too large (fallback)');
+        Alert.alert('File Too Large', 'Please select an image smaller than 10MB');
+        return;
+      }
+      
+      console.log('File size validation passed (fallback)');
+      
+      // Convert to base64
+      console.log('Converting image to base64 (fallback)...');
+      const base64Result = await convertImageToBase64(fileUri);
+      console.log('Base64 conversion completed (fallback), length:', base64Result.base64.length);
+      
+      // Call extraction API
+      console.log('Calling receipt extraction API (fallback)...');
+      const extractionResult = await receiptExtractionAPI.extractReceiptDetails(base64Result.base64);
+      console.log('Extraction API response (fallback):', extractionResult);
+      
+      // Call the callback with extraction results
+      if (onExtractionComplete) {
+        console.log('Calling onExtractionComplete callback (fallback)');
+        onExtractionComplete(extractionResult);
+      }
+      
+      Alert.alert(
+        'Receipt Extracted!', 
+        `Successfully extracted data from receipt:\n\nBusiness: ${extractionResult.business_name}\nItems: ${extractionResult.items.length} found`
+      );
+      
+    } catch (error) {
+      console.error('Receipt extraction error (fallback):', error);
+      Alert.alert(
+        'Extraction Failed', 
+        error instanceof Error ? error.message : 'Failed to extract receipt details. Please try again.'
+      );
+    } finally {
+      console.log('Setting isExtracting to false (fallback)');
+      setIsExtracting(false);
+    }
+  }, [onExtractionComplete]);
 
   // Document picker - keeping as placeholder for now
   const handlePickPdf = () => {
-    handleDismiss();
+    setIsModalVisible(false);
     Alert.alert('Info', 'Document picker functionality will be implemented later');
   };
 
@@ -253,7 +207,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
       {/* Upload Area - matches reference image design */}
       <TouchableOpacity 
         style={[styles.uploadArea, { borderColor: colors.border }]} 
-        onPress={handlePresentModalPress}
+        onPress={() => setIsModalVisible(true)}
         activeOpacity={0.7}
         disabled={isExtracting}
       >
@@ -282,7 +236,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
                 Drop your image here, or <Text style={[styles.browseText, { color: colors.primary }]}>browse</Text>
               </Text>
               <Text style={[styles.uploadSubtitle, { color: colors.placeholder }]}>
-                Supports: JPG, JPEG2000, PNG, PDF
+                Supports: JPG, JPEG2000, PNG
               </Text>
             </>
           )}
@@ -315,79 +269,79 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
         </View>
       )}
 
-      {/* Bottom Sheet Modal with error boundary */}
-      <BottomSheetModal
-        ref={bottomSheetModalRef}
-        index={0}
-        snapPoints={snapPoints}
-        onChange={handleSheetChanges}
-        enablePanDownToClose={true}
-        backdropComponent={renderBackdrop}
-        backgroundStyle={{ backgroundColor: colors.card }}
-        handleIndicatorStyle={{ backgroundColor: colors.placeholder }}
-        android_keyboardInputMode="adjustResize"
-        keyboardBehavior="interactive"
-        keyboardBlurBehavior="restore"
+      {/* Fallback Modal */}
+      <Modal
+        visible={isModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsModalVisible(false)}
       >
-        <BottomSheetView style={styles.modalContent}>
-          <Text style={[styles.modalTitle, { color: colors.text }]}>
-            Upload Receipt
-          </Text>
-          
-          <View style={styles.modalOptions}>
-            {/* Camera Option */}
-            <TouchableOpacity 
-              style={[styles.modalOption, { backgroundColor: colors.card, borderColor: colors.border }]} 
-              onPress={handleTakePhoto}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
-                <Feather name="camera" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.optionContent}>
-                <Text style={[styles.optionTitle, { color: colors.text }]}>Take Photo</Text>
-                <Text style={[styles.optionSubtitle, { color: colors.placeholder }]}>
-                  Use camera to capture receipt
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={colors.placeholder} />
-            </TouchableOpacity>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { backgroundColor: colors.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Upload Receipt
+              </Text>
+              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+                <Feather name="x" size={24} color={colors.placeholder} />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.modalOptions}>
+              {/* Camera Option */}
+              <TouchableOpacity 
+                style={[styles.modalOption, { backgroundColor: colors.card, borderColor: colors.border }]} 
+                onPress={handleTakePhoto}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <Feather name="camera" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={[styles.optionTitle, { color: colors.text }]}>Take Photo</Text>
+                  <Text style={[styles.optionSubtitle, { color: colors.placeholder }]}>
+                    Use camera to capture receipt
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={20} color={colors.placeholder} />
+              </TouchableOpacity>
 
-            {/* Gallery Option */}
-            <TouchableOpacity 
-              style={[styles.modalOption, { backgroundColor: colors.card, borderColor: colors.border }]} 
-              onPress={handlePickImage}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
-                <Feather name="image" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.optionContent}>
-                <Text style={[styles.optionTitle, { color: colors.text }]}>Choose from Gallery</Text>
-                <Text style={[styles.optionSubtitle, { color: colors.placeholder }]}>
-                  Select image from your device
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={colors.placeholder} />
-            </TouchableOpacity>
+              {/* Gallery Option */}
+              <TouchableOpacity 
+                style={[styles.modalOption, { backgroundColor: colors.card, borderColor: colors.border }]} 
+                onPress={handlePickImage}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <Feather name="image" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={[styles.optionTitle, { color: colors.text }]}>Choose from Gallery</Text>
+                  <Text style={[styles.optionSubtitle, { color: colors.placeholder }]}>
+                    Select image from your device
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={20} color={colors.placeholder} />
+              </TouchableOpacity>
 
-            {/* Document Option */}
-            <TouchableOpacity 
-              style={[styles.modalOption, { backgroundColor: colors.card, borderColor: colors.border }]} 
-              onPress={handlePickPdf}
-            >
-              <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
-                <Feather name="file-text" size={24} color={colors.primary} />
-              </View>
-              <View style={styles.optionContent}>
-                <Text style={[styles.optionTitle, { color: colors.text }]}>Upload Document</Text>
-                <Text style={[styles.optionSubtitle, { color: colors.placeholder }]}>
-                  Select PDF or document file
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={colors.placeholder} />
-            </TouchableOpacity>
+              {/* Document Option */}
+              <TouchableOpacity 
+                style={[styles.modalOption, { backgroundColor: colors.card, borderColor: colors.border }]} 
+                onPress={handlePickPdf}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <Feather name="file-text" size={24} color={colors.primary} />
+                </View>
+                <View style={styles.optionContent}>
+                  <Text style={[styles.optionTitle, { color: colors.text }]}>Upload Document</Text>
+                  <Text style={[styles.optionSubtitle, { color: colors.placeholder }]}>
+                    Select PDF or document file
+                  </Text>
+                </View>
+                <Feather name="chevron-right" size={20} color={colors.placeholder} />
+              </TouchableOpacity>
+            </View>
           </View>
-        </BottomSheetView>
-      </BottomSheetModal>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -496,15 +450,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContent: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 20,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   modalTitle: {
     fontSize: SIZES.large,
     fontWeight: '700',
-    marginBottom: 24,
-    textAlign: 'center',
   },
   modalOptions: {
     gap: 16,

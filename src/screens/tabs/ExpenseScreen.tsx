@@ -2,9 +2,7 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { 
   View, 
   StyleSheet, 
-  FlatList, 
   TouchableOpacity,
-  RefreshControl,
   Text,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,16 +12,11 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/useTheme';
 import { Header } from '../../components/layout/Header';
 import { 
-  ExpenseCard, 
-  GroupedExpenseCard,
-  FilterTabs, 
+  ExpenseTabView,
   SearchBar, 
   EmptyState, 
-  LoadingFooter, 
   FloatingActionButton,
-  type ExpenseItem,
-  type GroupedExpenseItem,
-  type FilterOption
+  type GroupedExpenseItem
 } from '../../components/expenses';
 import { SIZES } from '../../constants/theme';
 import { navigate } from '../../utils/NavigationUtils';
@@ -120,15 +113,9 @@ export const ExpenseScreen: React.FC = () => {
   
   // State management
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('approved');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [hasMoreData, setHasMoreData] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
   const [showSearch, setShowSearch] = useState(false);
   
   // Refs for performance
-  const flatListRef = useRef<FlatList<any>>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Transform API data to grouped ExpenseItem format
@@ -139,8 +126,8 @@ export const ExpenseScreen: React.FC = () => {
     return transformed;
   }, [expenseDetails]);
 
-  // Memoized filtered and paginated data
-  const { filteredExpenses, totalExpenses, approvedExpenses, pendingExpenses, rejectedExpenses } = useMemo(() => {
+  // Memoized filtered data
+  const filteredExpenses = useMemo(() => {
     let filtered = allExpenses;
     
     // Apply search filter
@@ -160,28 +147,8 @@ export const ExpenseScreen: React.FC = () => {
       );
     }
     
-    // Calculate statistics from complete dataset (not filtered)
-    const totalExpenses = allExpenses.length;
-    const approvedExpenses = allExpenses.filter(e => e.status === 'approved').length;
-    const pendingExpenses = allExpenses.filter(e => e.status === 'pending').length;
-    const rejectedExpenses = allExpenses.filter(e => e.status === 'rejected').length;
-    
-    // Apply status filter
-    filtered = filtered.filter(expense => expense.status === selectedFilter);
-    
-    // Apply pagination with smooth loading
-    const startIndex = 0;
-    const endIndex = currentPage * ITEMS_PER_PAGE;
-    const paginatedExpenses = filtered.slice(startIndex, endIndex);
-    
-    return {
-      filteredExpenses: paginatedExpenses,
-      totalExpenses,
-      approvedExpenses,
-      pendingExpenses,
-      rejectedExpenses,
-    };
-  }, [allExpenses, searchQuery, selectedFilter, currentPage]);
+    return filtered;
+  }, [allExpenses, searchQuery]);
   
   // Optimized search handler with debouncing
   const handleSearch = useCallback((text: string) => {
@@ -191,60 +158,13 @@ export const ExpenseScreen: React.FC = () => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
-    
-    // Debounce search to avoid excessive filtering
-    searchTimeoutRef.current = setTimeout(() => {
-      setCurrentPage(1); // Reset to first page when searching
-    }, 300);
   }, []);
-  
-  // Load more data handler
-  const handleLoadMore = useCallback(() => {
-    if (!isLoading && hasMoreData && filteredExpenses.length < totalExpenses) {
-      setIsLoading(true);
-      
-      // Use requestAnimationFrame for smoother transitions
-      requestAnimationFrame(() => {
-        setCurrentPage(prev => {
-          const newPage = prev + 1;
-          // Check if we've loaded all data
-          if (newPage * ITEMS_PER_PAGE >= totalExpenses) {
-            setHasMoreData(false);
-          }
-          return newPage;
-        });
-        
-        // Small delay to show loading state without blocking UI
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 300);
-      });
-    }
-  }, [isLoading, hasMoreData, filteredExpenses.length, totalExpenses, currentPage]);
-  
-  // Refresh handler
-  const handleRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    
-    try {
-      await refetch();
-      setCurrentPage(1);
-      setHasMoreData(true);
-    } catch (error) {
-      console.error('Failed to refresh expense data:', error);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [refetch]);
   
   const handleCreateExpense = useCallback(() => {
     navigate('CreateExpense', {});
   }, []);
 
-  const handleFilterChange = useCallback((filter: string) => {
-    setSelectedFilter(filter);
-    setCurrentPage(1); // Reset to first page when filtering
-  }, []);
+
 
   const handleExpensePress = useCallback((id: string) => {
     console.log('Expense pressed with id:', id);
@@ -291,24 +211,7 @@ export const ExpenseScreen: React.FC = () => {
     console.log('More options pressed');
   }, []);
   
-  // Memoized key extractor
-  const keyExtractor = useCallback((item: GroupedExpenseItem) => item.id, []);
-  
-  // Memoized expense item renderer
-  const renderExpenseItem = useCallback(({ item }: { item: GroupedExpenseItem }) => (
-    <GroupedExpenseCard
-      item={item}
-      onPress={handleExpensePress}
-      onMorePress={handleMorePress}
-    />
-  ), [handleExpensePress, handleMorePress]);
 
-  // Memoized filter options
-  const filterOptions: FilterOption[] = useMemo(() => [
-    { key: 'approved', label: 'Approved', count: approvedExpenses },
-    { key: 'pending', label: 'Pending', count: pendingExpenses },
-    { key: 'rejected', label: 'Rejected', count: rejectedExpenses },
-  ], [approvedExpenses, pendingExpenses, rejectedExpenses]);
   
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -350,58 +253,11 @@ export const ExpenseScreen: React.FC = () => {
         </>
       )}
       
-      {/* Filter Tabs */}
-      <FilterTabs
-        filters={filterOptions}
-        selectedFilter={selectedFilter}
-        onFilterChange={handleFilterChange}
-      />
-      
-      <FlatList
-        ref={flatListRef}
-        data={filteredExpenses}
-        keyExtractor={keyExtractor}
-        renderItem={renderExpenseItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing || apiLoading}
-            onRefresh={handleRefresh}
-            colors={[colors.primary]}
-            tintColor={colors.primary}
-          />
-        }
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
-        ListEmptyComponent={
-          searchQuery.trim() ? (
-            <EmptyState 
-              title="No search results found"
-              subtitle={`No expenses match "${searchQuery}". Try different keywords or check your spelling.`}
-              icon="search"
-            />
-          ) : (
-            <EmptyState />
-          )
-        }
-        ListFooterComponent={<LoadingFooter isLoading={isLoading} />}
-        // Performance optimizations for smoother scrolling
-        removeClippedSubviews={false}
-        maxToRenderPerBatch={5}
-        windowSize={5}
-        initialNumToRender={10}
-        updateCellsBatchingPeriod={50}
-        // Smooth scrolling configuration
-        scrollEventThrottle={16}
-        decelerationRate="fast"
-        bounces={true}
-        alwaysBounceVertical={false}
-        // Prevent layout shifts
-        maintainVisibleContentPosition={{
-          minIndexForVisible: 0,
-          autoscrollToTopThreshold: 10,
-        }}
+      {/* Expense Tab View */}
+      <ExpenseTabView
+        expenses={filteredExpenses}
+        onExpensePress={handleExpensePress}
+        onMorePress={handleMorePress}
       />
       
       <FloatingActionButton onPress={handleCreateExpense} />

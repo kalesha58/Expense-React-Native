@@ -44,7 +44,15 @@ interface ReceiptExtractionResult {
   items: Array<{
     description: string;
     price: number;
+    quantity?: number;
   }>;
+  total_amount?: number;
+  expense_type?: string;
+  Expense_Type?: string;
+  from_location?: string | null;
+  to_location?: string | null;
+  check_in_date?: string;
+  check_out_date?: string;
 }
 
 interface LineItemData {
@@ -58,6 +66,10 @@ interface LineItemData {
   supplier: string;
   comment: string;
   itemize?: boolean;
+  // Dynamic fields based on expense type
+  toLocation?: string;
+  dailyRates?: string;
+  numberOfDays?: string;
 }
 
 interface RouteParams {
@@ -120,6 +132,7 @@ export const LineItemEntryScreen: React.FC = () => {
   const [itemize, setItemize] = useState(false);
   const [receipts, setReceipts] = useState<ReceiptFile[]>([]);
   const [itemizedExpenses, setItemizedExpenses] = useState<ItemizedExpense[]>([]);
+  const [extractedItems, setExtractedItems] = useState<ReceiptExtractionResult['items']>([]);
   
   // New required fields for payload
   const [numberOfDays, setNumberOfDays] = useState('1');
@@ -167,6 +180,78 @@ export const LineItemEntryScreen: React.FC = () => {
     initializeLineItem();
   }, [existingLineItem]);
 
+  // Auto-save extracted itemized data to AsyncStorage
+  const autoSaveExtractedItemizedData = async (extractionResult: ReceiptExtractionResult) => {
+    try {
+      console.log('🔄 Auto-saving extracted itemized data...');
+      
+      // Ensure we have a valid line item ID
+      let lineItemId = currentLineItemId;
+      if (!lineItemId || lineItemId.trim() === '') {
+        // Generate a new line item ID if not set
+        lineItemId = `line_item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        console.log('🆕 Generated new lineItemId for auto-save:', lineItemId);
+        setCurrentLineItemId(lineItemId);
+      }
+      
+      console.log('🔍 Current state values:', {
+        lineItemId,
+        currentLineItemId,
+        expenseType,
+        currency,
+        location,
+        dateString: date.toISOString()
+      });
+      console.log('🔍 Extraction result items:', extractionResult.items);
+      
+      // Convert extracted items to ItemizedEntry format for storage
+      const itemizedEntries = extractionResult.items.map((item, index) => {
+        const entry = {
+          id: `auto_${Date.now()}_${index}`,
+          lineItemId: lineItemId,
+          description: `${expenseType || 'Business Meal'} - ${item.description}`,
+          amount: typeof item.price === 'number' ? item.price : parseFloat(item.price) || 0,
+          currency: currency || 'USD',
+          expenseType: expenseType || 'Business Meal',
+          date: date.toISOString(),
+          location: location || '',
+          supplier: item.description || '',
+          comment: item.quantity ? `Quantity: ${item.quantity}` : '',
+          itemDescription: `${expenseType || 'Business Meal'} - ${item.description}`,
+          startDate: date.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        };
+        console.log(`🔍 Creating entry ${index + 1}:`, entry);
+        return entry;
+      });
+
+      console.log('🔍 Final itemized entries to save:', itemizedEntries);
+      
+      // Save itemized entries to AsyncStorage
+      await AsyncStorageService.setItemizedExpenses(lineItemId, itemizedEntries);
+      
+      console.log('✅ Auto-saved itemized data successfully:', itemizedEntries.length, 'items');
+      
+      // Verify the save by reading it back
+      const savedData = await AsyncStorageService.getItemizedExpenses(lineItemId);
+      console.log('🔍 Verification - Data read back from AsyncStorage:', savedData);
+      
+      // Update itemized count for UI
+      setItemizedCount(itemizedEntries.length);
+      
+      // IMPORTANT: Set itemize flag to true since we have itemized data
+      setItemize(true);
+      console.log('✅ Set itemize flag to true due to auto-saved itemized data');
+      
+    } catch (error) {
+      console.error('❌ Error auto-saving itemized data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : '';
+      console.error('❌ Error details:', errorMessage, errorStack);
+      // Show error to user for debugging
+      Alert.alert('Debug Error', `Failed to auto-save itemized data: ${errorMessage}`);
+    }
+  };
+
   // Handle receipt extraction results
   const handleReceiptExtraction = React.useCallback((extractionResult: ReceiptExtractionResult) => {
     try {
@@ -178,20 +263,54 @@ export const LineItemEntryScreen: React.FC = () => {
         setSupplier(extractionResult.business_name);
       }
 
-      // Calculate total amount from items
-      const totalAmount = extractionResult.items.reduce((sum, item) => sum + item.price, 0);
-      console.log('Setting amount to:', totalAmount.toFixed(2));
-      setAmount(totalAmount.toFixed(2));
+      // Auto-fill expense type if available
+      const extractedExpenseType = extractionResult.Expense_Type || extractionResult.expense_type;
+      if (extractedExpenseType) {
+        console.log('Setting expense type to:', extractedExpenseType);
+        setExpenseType(extractedExpenseType);
+      }
 
-      // If itemization is enabled, populate itemized expenses
-      if (itemize && extractionResult.items.length > 0) {
-        console.log('Populating itemized expenses:', extractionResult.items);
-        const newItemizedExpenses: ItemizedExpense[] = extractionResult.items.map((item, index) => ({
-          id: `item_${Date.now()}_${index}`,
-          description: item.description,
-          amount: item.price,
-        }));
-        setItemizedExpenses(newItemizedExpenses);
+      // Auto-fill dates if available (use check_in_date)
+      if (extractionResult.check_in_date) {
+        console.log('Setting date to:', extractionResult.check_in_date);
+        setDate(new Date(extractionResult.check_in_date));
+      }
+
+      // Auto-fill location if available
+      if (extractionResult.to_location) {
+        console.log('Setting location to:', extractionResult.to_location);
+        setLocation(extractionResult.to_location);
+        setToLocation(extractionResult.to_location);
+      }
+
+      // Calculate total amount - use extracted total if available, otherwise sum items
+      const calculatedTotal = extractionResult.items.reduce((sum, item) => sum + item.price, 0);
+      const finalTotal = extractionResult.total_amount || calculatedTotal;
+      console.log('Setting amount to:', finalTotal.toFixed(2));
+      setAmount(finalTotal.toFixed(2));
+
+      // Auto-enable itemization if multiple items detected
+      if (extractionResult.items.length > 1) {
+        console.log('Multiple items detected, enabling itemization');
+        setItemize(true);
+        setItemizedCount(extractionResult.items.length);
+        
+        // Store extraction data for later use in ItemizedBusinessExpensesScreen
+        console.log('📦 Storing extraction data for itemized screen:', extractionResult.items);
+        setExtractedItems(extractionResult.items);
+        
+        // Check if user has acknowledged the itemization popup
+        if ((extractionResult as any).userAcknowledgedItemization) {
+
+          // Automatically save the itemized data since user clicked OK
+          autoSaveExtractedItemizedData(extractionResult);
+        } else {
+          console.log('⏳ Waiting for user acknowledgment from popup...');
+        }
+      } else {
+        setItemize(false);
+        setItemizedCount(0);
+        setExtractedItems([]);
       }
 
       // Clear any existing errors
@@ -213,6 +332,8 @@ export const LineItemEntryScreen: React.FC = () => {
   // Populate form with existing data if in edit mode
   useEffect(() => {
     if (isEditMode && existingLineItem) {
+      console.log('🔧 Loading existing line item for edit:', existingLineItem);
+      
       setDate(existingLineItem.date);
       setExpenseType(existingLineItem.expenseType);
       setAmount(existingLineItem.amount);
@@ -222,6 +343,22 @@ export const LineItemEntryScreen: React.FC = () => {
       setComments(existingLineItem.comment);
       setItemize(existingLineItem.itemize || false);
       setReceipts(existingLineItem.receiptFiles || []);
+      
+      // Populate dynamic fields if they exist
+      if (existingLineItem.toLocation) {
+        console.log('🔧 Setting toLocation:', existingLineItem.toLocation);
+        setToLocation(existingLineItem.toLocation);
+      }
+      if (existingLineItem.dailyRates) {
+        console.log('🔧 Setting dailyRates:', existingLineItem.dailyRates);
+        setDailyRates(existingLineItem.dailyRates);
+      }
+      if (existingLineItem.numberOfDays) {
+        console.log('🔧 Setting numberOfDays:', existingLineItem.numberOfDays);
+        setNumberOfDays(existingLineItem.numberOfDays);
+      }
+      
+      console.log('✅ All existing line item data loaded');
     }
   }, [isEditMode, existingLineItem]);
 
@@ -276,6 +413,9 @@ export const LineItemEntryScreen: React.FC = () => {
   const handleAddLineItem = () => {
     if (!validateForm()) return;
 
+    console.log('🔍 DEBUG: Saving line item with itemize flag:', itemize);
+    console.log('🔍 DEBUG: Current itemized count:', itemizedCount);
+
     const lineItemData: LineItemData = {
       id: currentLineItemId, // Use consistent ID
       date,
@@ -287,6 +427,10 @@ export const LineItemEntryScreen: React.FC = () => {
       comment: comments,
       itemize,
       receiptFiles: receipts,
+      // Include dynamic fields based on expense type
+      toLocation: toLocation || undefined,
+      dailyRates: dailyRates || undefined,
+      numberOfDays: numberOfDays || undefined,
     };
 
     if (isEditMode && onSaveCallback) {
@@ -312,6 +456,10 @@ export const LineItemEntryScreen: React.FC = () => {
 
   const handleContinueToReview = async () => {
     if (!validateForm()) return;
+    
+    console.log('🔍 DEBUG: Continue to review with itemize flag:', itemize);
+    console.log('🔍 DEBUG: Current itemized count:', itemizedCount);
+    
     try {
       // Create the line item data
       const lineItemData: LineItemData = {
@@ -325,6 +473,10 @@ export const LineItemEntryScreen: React.FC = () => {
         comment: comments,
         itemize,
         receiptFiles: receipts,
+        // Include dynamic fields based on expense type
+        toLocation: toLocation || undefined,
+        dailyRates: dailyRates || undefined,
+        numberOfDays: numberOfDays || undefined,
       };
 
       if (isEditMode && onSaveCallback) {
@@ -617,7 +769,12 @@ export const LineItemEntryScreen: React.FC = () => {
                 onAmountUpdate: (newAmount: number) => {
                   console.log('💰 Updating line item amount from itemized screen:', newAmount);
                   setAmount(newAmount.toString());
-                }
+                },
+                // Pass extracted items data for auto-fill
+                extractedItems: extractedItems.length > 0 ? extractedItems : undefined,
+                extractedExpenseType: expenseType || undefined, // Pass the current expense type
+                extractedDate: date || undefined, // Pass the current date
+                extractedLocation: location || undefined // Pass the current location
               };
               
               (navigation as any).navigate('ItemizedBusinessExpenses', navigationParams);
@@ -643,82 +800,7 @@ export const LineItemEntryScreen: React.FC = () => {
 
 
         {/* Itemized Expenses Section */}
-        {itemize && (
-          <View style={[styles.formCard, { backgroundColor: colors.card, borderColor: colors.border }, shadows.small]}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Itemized Expenses
-            </Text>
-            
-            {itemizedExpenses.length > 0 ? (
-              <View style={styles.itemizedList}>
-                {itemizedExpenses.map((item, index) => (
-                  <View key={item.id} style={[styles.itemizedItem, { borderColor: colors.border }]}>
-                    <View style={styles.itemizedItemHeader}>
-                      <Text style={[styles.itemizedItemTitle, { color: colors.text }]}>
-                        Item {index + 1}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => {
-                          const newItems = itemizedExpenses.filter((_, i) => i !== index);
-                          setItemizedExpenses(newItems);
-                        }}
-                        style={styles.removeItemButton}
-                      >
-                        <Feather name="x" size={16} color={colors.error || '#F5222D'} />
-                      </TouchableOpacity>
-                    </View>
-                    
-                    <Input
-                      label="Description"
-                      placeholder="Enter item description"
-                      value={item.description}
-                      onChangeText={(text) => {
-                        const newItems = [...itemizedExpenses];
-                        newItems[index] = { ...item, description: text };
-                        setItemizedExpenses(newItems);
-                      }}
-                      containerStyle={styles.itemizedInput}
-                    />
-                    
-                    <Input
-                      label="Amount"
-                      placeholder="0.00"
-                      value={item.amount.toString()}
-                      onChangeText={(text) => {
-                        const numValue = parseFloat(text) || 0;
-                        const newItems = [...itemizedExpenses];
-                        newItems[index] = { ...item, amount: numValue };
-                        setItemizedExpenses(newItems);
-                      }}
-                      keyboardType="numeric"
-                      containerStyle={styles.itemizedInput}
-                    />
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={[styles.emptyItemizedText, { color: colors.placeholder }]}>
-                No itemized expenses yet. Upload a receipt to automatically populate items.
-              </Text>
-            )}
-            
-            <TouchableOpacity
-              style={[styles.addItemButton, { backgroundColor: colors.primary }]}
-              onPress={() => {
-                const newItem: ItemizedExpense = {
-                  id: `item_${Date.now()}`,
-                  description: '',
-                  amount: 0,
-                };
-                setItemizedExpenses([...itemizedExpenses, newItem]);
-              }}
-            >
-              <Feather name="plus" size={20} color="#FFFFFF" />
-              <Text style={styles.addItemButtonText}>Add Item</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
+     
         <View style={styles.actionsContainer}>
         {!isEditMode && (
           <Button

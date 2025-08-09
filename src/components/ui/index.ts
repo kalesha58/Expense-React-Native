@@ -7,6 +7,7 @@ export { ImageSlider } from './ImageSlider';
 export { AttachmentCarousel } from './AttachmentCarousel';
 export { ReceiptUpload } from './ReceiptUpload';
 export { PdfGenerator, generateExpensePdf } from './PdfGenerator';
+export { generateEnhancedExpensePdf } from './EnhancedPdfGenerator';
 export { 
   SkeletonLoader, 
   ExpenseCardSkeleton, 

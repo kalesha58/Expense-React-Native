@@ -23,6 +23,7 @@ import {
 import { useExpenseForm } from '../hooks/useExpenseForm';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { AsyncStorageService } from '../services/asyncStorage';
+import { extractReceiptDataSilent, ReceiptExtractionResult } from '../utils/receiptUtils';
 
 type CreateExpenseScreenRouteProp = RouteProp<RootStackParamList, 'CreateExpense'>;
 
@@ -32,9 +33,10 @@ export const CreateExpenseScreen: React.FC = () => {
   const route = useRoute<CreateExpenseScreenRouteProp>();
   
   // Get parameters passed from camera/navigation
-  const { receiptImage, extractedData } = route.params || {};
+  const { receiptImage, extractedData, startExtractionInBackground } = route.params || {};
   const [isProcessingReceipt, setIsProcessingReceipt] = useState(false);
   const [hasAutoFilled, setHasAutoFilled] = useState(false);
+  const [extractionData, setExtractionData] = useState<ReceiptExtractionResult | null>(extractedData || null);
 
   // Debug logging for navigation parameters
   console.log('📄 CreateExpenseScreen mounted with params:', {
@@ -55,48 +57,107 @@ export const CreateExpenseScreen: React.FC = () => {
     handleSubmit,
   } = useExpenseForm();
 
+  // Handle background extraction when startExtractionInBackground is true
+  useEffect(() => {
+    const startBackgroundExtraction = async () => {
+      if (receiptImage && startExtractionInBackground && !extractionData && !hasAutoFilled) {
+        console.log('🔄 Starting background receipt extraction...');
+        setIsProcessingReceipt(true);
+        
+        try {
+          const result = await extractReceiptDataSilent(receiptImage);
+          
+          if (result) {
+            console.log('✅ Background extraction successful:', result);
+            setExtractionData(result);
+          } else {
+            console.log('❌ Background extraction failed or returned null');
+          }
+        } catch (error) {
+          console.error('Background extraction error:', error);
+        } finally {
+          setIsProcessingReceipt(false);
+        }
+      }
+    };
+
+    startBackgroundExtraction();
+  }, [receiptImage, startExtractionInBackground, extractionData, hasAutoFilled]);
+
   // Handle receipt processing state
   useEffect(() => {
-    if (receiptImage && !extractedData && !hasAutoFilled) {
+    if (receiptImage && !extractionData && !hasAutoFilled && !startExtractionInBackground) {
       // We have an image but no extracted data yet, show processing state
       console.log('🔄 Showing processing state - waiting for extraction');
       setIsProcessingReceipt(true);
     } else {
       // We have extracted data, no receipt image, or already auto-filled
       console.log('✅ Hiding processing state');
-      setIsProcessingReceipt(false);
+      // Don't hide processing if we're doing background extraction
+      if (!startExtractionInBackground || extractionData) {
+        setIsProcessingReceipt(false);
+      }
     }
-  }, [receiptImage, extractedData, hasAutoFilled]);
+  }, [receiptImage, extractionData, hasAutoFilled, startExtractionInBackground]);
 
   // Auto-fill form with extracted receipt data
   useEffect(() => {
     const autoFillFromExtraction = async () => {
-      if (extractedData && receiptImage && !hasAutoFilled) {
+      if (extractionData && receiptImage && !hasAutoFilled) {
         try {
           setIsProcessingReceipt(false);
-          console.log('Auto-filling form with extracted data:', extractedData);
+          console.log('Auto-filling form with extracted data:', extractionData);
           setHasAutoFilled(true);
+          
+          // Get expense type from either field name
+          const expenseType = extractionData.Expense_Type || extractionData.expense_type || 'Business Meal';
+          
+          // Use check_in_date if available, otherwise current date
+          const expenseDate = extractionData.check_in_date ? new Date(extractionData.check_in_date) : new Date();
+          
+          // Calculate total amount and validate
+          const calculatedTotal = extractionData.items.reduce((sum, item) => sum + item.price, 0);
+          const finalTotal = extractionData.total_amount || calculatedTotal;
+          
+          // Validate total matches (allow small rounding differences)
+          const totalMismatch = Math.abs(finalTotal - calculatedTotal) > 0.01;
+          if (totalMismatch && extractionData.total_amount) {
+            console.warn(`Total mismatch: extracted=${extractionData.total_amount}, calculated=${calculatedTotal}`);
+          }
           
           // Generate a unique ID for the line item
           const lineItemId = `receipt_${Date.now()}`;
           
-          // Calculate total amount
-          const totalAmount = extractedData.total_amount || 
-                            extractedData.items.reduce((sum, item) => sum + item.price, 0);
+          // Handle multiple items as itemized entries
+          const isItemized = extractionData.items.length > 1;
           
           // Create line item with extracted data
           const lineItemData = {
             id: lineItemId,
             receiptFiles: [{ uri: receiptImage, name: 'receipt.jpg', mimeType: 'image/jpeg' }],
-            amount: totalAmount.toString(),
+            amount: finalTotal.toString(),
             currency: 'USD',
-            expenseType: extractedData.expense_type || 'Business Meal',
-            date: new Date(),
-            location: '',
-            supplier: extractedData.business_name || '',
-            comment: `Extracted: ${extractedData.items.length} items`,
-            itemize: extractedData.items.length > 1,
+            expenseType: expenseType,
+            date: expenseDate,
+            location: extractionData.to_location || '',
+            supplier: extractionData.business_name || '',
+            comment: isItemized ? 
+              `${extractionData.business_name} - ${extractionData.items.length} items` : 
+              `${extractionData.business_name}`,
+            itemize: isItemized,
           };
+
+          // Prepare itemized entries if multiple items
+          const itemizedEntries = isItemized ? extractionData.items.map((item, index) => ({
+            id: `item_${Date.now()}_${index}`,
+            description: item.description, // description → supplier field mapping
+            amount: item.price, // price → amount field mapping
+            expenseType: expenseType, // Apply expense type to all itemizations
+            supplier: item.description, // Use description as supplier for itemized entries
+            merchant: extractionData.business_name, // Set business_name as merchant
+            date: expenseDate.toISOString(), // Use check_in_date for itemizations
+            editable: true, // Ensure editability
+          })) : undefined;
 
           // Save line item to AsyncStorage
           const asyncStorageLineItem = {
@@ -109,21 +170,17 @@ export const CreateExpenseScreen: React.FC = () => {
             location: lineItemData.location,
             supplier: lineItemData.supplier,
             comment: lineItemData.comment,
-            itemized: lineItemData.itemize ? extractedData.items.map((item, index) => ({
-              id: `item_${Date.now()}_${index}`,
-              description: item.description,
-              amount: item.price,
-            })) : undefined,
+            itemized: itemizedEntries, // Store itemizations under parent's Itemized array
           };
 
           await AsyncStorageService.addLineItem(asyncStorageLineItem);
           
           // Update expense title with business name
-          if (extractedData.business_name) {
-            await updateFormData('title', `${extractedData.business_name} Receipt`);
+          if (extractionData.business_name) {
+            await updateFormData('title', `${extractionData.business_name} Receipt`);
           }
           
-          console.log('Auto-fill completed successfully');
+          console.log('Auto-fill completed successfully with itemized entries:', itemizedEntries?.length || 0);
           
         } catch (error) {
           console.error('Error auto-filling form with extracted data:', error);
@@ -131,10 +188,10 @@ export const CreateExpenseScreen: React.FC = () => {
       }
     };
 
-    if (extractedData && receiptImage && !hasAutoFilled) {
+    if (extractionData && receiptImage && !hasAutoFilled) {
       autoFillFromExtraction();
     }
-  }, [extractedData, receiptImage, hasAutoFilled, updateFormData]);
+  }, [extractionData, receiptImage, hasAutoFilled, updateFormData]);
 
 
 

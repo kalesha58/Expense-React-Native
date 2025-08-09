@@ -1,4 +1,5 @@
 import { AsyncStorageService, type LineItem, type ExpenseHeader as AsyncStorageHeader } from './asyncStorage';
+import { expenseItemAPI } from '../service/api';
 
 // Expense type reference mapping
 export interface ExpenseTypeReference {
@@ -30,7 +31,13 @@ export const EXPENSE_TYPE_MAPPING: { [key: string]: string } = {
 
 // Export helper function for external use
 export const getExpenseReportIdForType = (expenseType: string): string => {
-  return getExpenseReportId(expenseType);
+  return getExpenseReportIdFallback(expenseType);
+};
+
+// Export function to clear expense reference cache (useful for testing or data refresh)
+export const clearExpenseReferenceCache = (): void => {
+  expenseReferenceCache = null;
+  console.log('Expense reference cache cleared');
 };
 
 // TypeScript interfaces for the API payload
@@ -54,7 +61,7 @@ export interface ExpenseLineItem {
   Location: string;
   ToLocation: string;
   MerchantName: string;
-  DailyRates: null;
+  DailyRates: number | null;
   Itemized: ExpenseItemized[];
 }
 
@@ -103,8 +110,83 @@ const generateMobileTransactionId = (): string => {
   return `${Date.now()}`;
 };
 
-// Get ExpenseReportID based on expense type
-const getExpenseReportId = (expenseType: string): string => {
+// Cache for expense reference data
+let expenseReferenceCache: ExpenseTypeReference[] | null = null;
+
+// Fetch expense reference data from API
+const fetchExpenseReferenceData = async (): Promise<ExpenseTypeReference[]> => {
+  try {
+    // Return cached data if available
+    if (expenseReferenceCache) {
+      return expenseReferenceCache;
+    }
+
+    console.log('Fetching expense reference data from API...');
+    const response = await expenseItemAPI.getExpenseItem();
+    
+    if (response && response.data && Array.isArray(response.data)) {
+      // Transform API response to our interface
+      const referenceData: ExpenseTypeReference[] = response.data.map((item: any) => ({
+        ExpenseItemID: item.ExpenseItemID || item.expenseItemId || '',
+        ExpenseReportID: item.ExpenseReportID || item.expenseReportId || '',
+        ExpenseType: item.ExpenseType || item.expenseType || '',
+        ExpenseItem: item.ExpenseItem || item.expenseItem || '',
+        Flag: item.Flag || item.flag || '',
+        SyncStatus: item.SyncStatus || item.syncStatus || ''
+      }));
+
+      // Cache the data
+      expenseReferenceCache = referenceData;
+      console.log('Expense reference data cached:', referenceData.length, 'items');
+      return referenceData;
+    }
+
+    console.warn('No expense reference data received from API');
+    return [];
+  } catch (error) {
+    console.error('Error fetching expense reference data:', error);
+    return [];
+  }
+};
+
+// Get both ExpenseReportId and ReportHeaderID based on expense type
+const getExpenseReportMapping = async (expenseType: string): Promise<{ expenseReportId: string; reportHeaderID: string }> => {
+  try {
+    const referenceData = await fetchExpenseReferenceData();
+    
+    // Find matching expense type in reference data
+    const matchingItem = referenceData.find(item => 
+      item.ExpenseType === expenseType || 
+      item.ExpenseItem === expenseType ||
+      item.ExpenseType.toLowerCase() === expenseType.toLowerCase() ||
+      item.ExpenseItem.toLowerCase() === expenseType.toLowerCase()
+    );
+
+    if (matchingItem) {
+      // Use fallback mapping for ExpenseReportId
+      const expenseReportId = getExpenseReportIdFallback(expenseType);
+      // Use API ExpenseReportID for ReportHeaderID
+      const reportHeaderID = matchingItem.ExpenseReportID || expenseReportId;
+      
+      console.log(`Found mapping for ${expenseType}:`);
+      console.log(`- ExpenseReportId will use: ${reportHeaderID} (from API: ${matchingItem.ExpenseReportID})`);
+      console.log(`- ReportHeaderID will be: empty`);
+      return { expenseReportId, reportHeaderID };
+    }
+
+    // Fallback to static mapping if no API data found
+    console.warn(`No ExpenseReportID found in API data for expense type: ${expenseType}, using fallback`);
+    const fallbackId = getExpenseReportIdFallback(expenseType);
+    return { expenseReportId: fallbackId, reportHeaderID: fallbackId };
+  } catch (error) {
+    console.error('Error getting ExpenseReportID from API:', error);
+    const fallbackId = getExpenseReportIdFallback(expenseType);
+    return { expenseReportId: fallbackId, reportHeaderID: fallbackId };
+  }
+};
+
+// Fallback ExpenseReportID mapping (for when API is unavailable)
+const getExpenseReportIdFallback = (expenseType: string): string => {
   const expenseTypeMap: { [key: string]: string } = {
     'TRAVEL': '1001',
     'MEALS': '1002',
@@ -114,39 +196,49 @@ const getExpenseReportId = (expenseType: string): string => {
     'CLIENT_ENTERTAINMENT': '1006',
     'TRAINING': '1007',
     'MISCELLANEOUS': '1008',
+    // Add common expense types
+    'Hotel': '1003',
+    'Airfare': '1001',
+    'Car Rental': '1004',
+    'Business Meal': '1002',
+    'Breakfast': '1002',
+    'Dinner': '1002',
+    'Cab': '1004',
+    'Taxi': '1004',
   };
 
-  const expenseReportId = expenseTypeMap[expenseType];
-  if (!expenseReportId) {
-    // No ExpenseReportID found for expense type, using default
-  }
+  const expenseReportId = expenseTypeMap[expenseType] || expenseTypeMap[expenseType.toUpperCase()];
   return expenseReportId || '1008'; // Default to MISCELLANEOUS
 };
 
-// Get the most appropriate ExpenseReportID for multiple line items
-const getBestExpenseReportId = (lineItems: LineItem[]): string => {
+// Get the most appropriate ExpenseReportID mapping for multiple line items
+const getBestExpenseReportMapping = async (lineItems: LineItem[]): Promise<{ expenseReportId: string; reportHeaderID: string }> => {
   if (!lineItems || lineItems.length === 0) {
-    return EXPENSE_TYPE_MAPPING['default'];
+    const fallbackId = getExpenseReportIdFallback('MISCELLANEOUS');
+    return { expenseReportId: fallbackId, reportHeaderID: fallbackId };
   }
 
   // If single item, use its expense type
   if (lineItems.length === 1) {
-    return getExpenseReportId(lineItems[0].expenseType || 'default');
+    return await getExpenseReportMapping(lineItems[0].expenseType || 'MISCELLANEOUS');
   }
 
   // For multiple items, prioritize based on expense type hierarchy
-  const priorityOrder = ['Accommodations', 'Airfare', 'Car Rental', 'Meals', 'Miscellaneous'];
+  const priorityOrder = ['Airfare', 'Hotel', 'Car Rental', 'Business Meal', 'Meals', 'MISCELLANEOUS'];
   
   for (const priority of priorityOrder) {
     for (const item of lineItems) {
-      if (item.expenseType && getExpenseReportId(item.expenseType) === EXPENSE_TYPE_MAPPING[priority]) {
-        return EXPENSE_TYPE_MAPPING[priority];
+      if (item.expenseType && (
+        item.expenseType === priority || 
+        item.expenseType.toLowerCase() === priority.toLowerCase()
+      )) {
+        return await getExpenseReportMapping(item.expenseType);
       }
     }
   }
 
   // Fallback to first item's expense type
-  return getExpenseReportId(lineItems[0].expenseType || 'default');
+  return await getExpenseReportMapping(lineItems[0].expenseType || 'MISCELLANEOUS');
 };
 
 // Convert AsyncStorage LineItem to API ExpenseLineItem
@@ -154,18 +246,29 @@ const convertLineItemToExpenseLineItem = (
   lineItem: LineItem, 
   lineNum: string
 ): ExpenseLineItem => {
+  // Convert itemized entries to the required format
+  const itemizedItems = lineItem.itemized ? lineItem.itemized.map(item => ({
+    ItemDescription: item.itemDescription || item.description || '',
+    StartDate: item.startDate || item.date || lineItem.date,
+    NumberOfDays: item.numberOfDays || '1',
+    Justification: item.justification || item.comment || '',
+    Amount: item.amount.toString(),
+    Location: item.location || lineItem.location || '',
+    MerchantName: item.merchantName || item.supplier || lineItem.supplier || '',
+  })) : [];
+
   return {
     LineNum: lineNum,
     ItemDescription: lineItem.expenseType || 'Expense Item',
-    StartDate: lineItem.date,
-    NumberOfDays: '1', // Default to 1 day
-    Justification: lineItem.comment || '',
+    StartDate: lineItem.startDate || lineItem.date,
+    NumberOfDays: lineItem.numberOfDays || '1',
+    Justification: lineItem.justification || lineItem.comment || '',
     Amount: lineItem.amount.toString(),
     Location: lineItem.location || '',
-    ToLocation: lineItem.location || '', // Same as location for now
-    MerchantName: lineItem.supplier || '',
-    DailyRates: null,
-    Itemized: [], // Empty array for now, can be extended later
+    ToLocation: lineItem.toLocation || '',
+    MerchantName: lineItem.merchantName || lineItem.supplier || '',
+    DailyRates: lineItem.dailyRates || null,
+    Itemized: itemizedItems,
   };
 };
 
@@ -184,14 +287,35 @@ const buildCreateExpensePayload = async (): Promise<CreateExpensePayload> => {
       throw new Error('At least one line item is required');
     }
 
+    // Load itemized data for each line item
+    const lineItemsWithItemized = await Promise.all(lineItems.map(async (lineItem) => {
+      // If line item has itemized field but it's empty/undefined, try to load from AsyncStorage
+      if (lineItem.itemized === undefined || (Array.isArray(lineItem.itemized) && lineItem.itemized.length === 0)) {
+        try {
+          const itemizedData = await AsyncStorageService.getItemizedExpenses(lineItem.id);
+          return {
+            ...lineItem,
+            itemized: itemizedData.length > 0 ? itemizedData : undefined
+          };
+        } catch (error) {
+          console.error(`Error loading itemized data for line item ${lineItem.id}:`, error);
+          return lineItem;
+        }
+      }
+      
+      return lineItem;
+    }));
+
     // Convert line items to API format with sequential line numbers
-    const expenses: ExpenseLineItem[] = lineItems.map((lineItem, index) => 
+    const expenses: ExpenseLineItem[] = lineItemsWithItemized.map((lineItem, index) => 
       convertLineItemToExpenseLineItem(lineItem, (index + 1).toString())
     );
 
-    // Get the most appropriate ExpenseReportID based on all line items
-    // All line items in a single expense report should use the same ExpenseReportID
-    const expenseReportId = getBestExpenseReportId(lineItems);
+    // Get the most appropriate ExpenseReportID mapping based on all line items
+    // ExpenseReportId uses API ExpenseReportID, ReportHeaderID will be empty
+    const { expenseReportId, reportHeaderID } = await getBestExpenseReportMapping(lineItems);
+    
+    console.log(`Using ExpenseReportId: ${reportHeaderID} (from API), ReportHeaderID: '' (empty)`);
 
     // Build the expense header
     const expenseHeader: ExpenseHeader = {
@@ -202,8 +326,8 @@ const buildCreateExpensePayload = async (): Promise<CreateExpensePayload> => {
       Currency: "PRUSD", // Hardcoded as per requirements
       ApproverId: "", // Empty for now
       Purpose: header.title,
-      ExpenseReportId: expenseReportId, // Set based on expense type
-      ReportHeaderID: expenseReportId, // Set to same value as ExpenseReportId
+        ExpenseReportId: expenseReportId, // Set based on API ExpenseReportID from expense items table
+        ReportHeaderID: '', // Empty as per requirement
       UserId: "1014803", // Hardcoded as per requirements
       RespID: "20419", // Hardcoded as per requirements
       Expenses: expenses,
@@ -214,7 +338,7 @@ const buildCreateExpensePayload = async (): Promise<CreateExpensePayload> => {
       Input: {
         parts: [
           {
-            id: "expense_report",
+            id: "part1",
             path: "/expense/report",
             Operation: "Save",
             ExpenseHeader: [expenseHeader],
@@ -223,8 +347,10 @@ const buildCreateExpensePayload = async (): Promise<CreateExpensePayload> => {
       },
     };
 
+    console.log('📦 Payload Built:', JSON.stringify(payload, null, 2));
     return payload;
   } catch (error) {
+    console.error('❌ Error building payload:', error);
     throw error;
   }
 };
@@ -277,12 +403,11 @@ export const createExpenseTransaction = async (): Promise<CreateExpenseResponse>
       apiResponse = responseData as CreateExpenseResponse;
     }
     
-  
-
-         // Note: AsyncStorage clearing is now handled in the hooks after banner display
+    console.log('📡 API Response:', apiResponse);
 
     return apiResponse;
   } catch (error) {
+    console.error('❌ Error in createExpenseTransaction:', error);
     throw error;
   }
 };

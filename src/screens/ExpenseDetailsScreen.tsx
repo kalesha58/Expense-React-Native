@@ -24,7 +24,7 @@ import { AttachmentCarousel } from '../components/ui';
 import { getActualFileType, shouldDisplayAsImage } from '../utils/fileTypeDetector';
 import { attachmentAPI } from '../service/api';
 import { Banner } from '../components/ui';
-import { PdfGenerator, generateExpensePdf } from '../components/ui/PdfGenerator';
+import { PdfGenerator, generateExpensePdf, generateEnhancedExpensePdf } from '../components/ui';
 import { SIZES, FONTS } from '../constants/theme';
 import { formatTransactionDate } from '../utils/dateUtils';
 import { processItemization, ProcessedExpenseItem, getItemizedGroup } from '../utils/itemizationUtils';
@@ -36,6 +36,9 @@ import {
   CompactExpenseItemCard,
   SearchModal
 } from '../components/expenses';
+import { permissionService } from '../services/permissionService';
+import RNHTMLtoPDF from 'react-native-html-to-pdf';
+import RNFS from 'react-native-fs';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -259,43 +262,78 @@ export const ExpenseDetailsScreen: React.FC = () => {
   };
 
   const requestStoragePermission = async () => {
-    if (Platform.OS === 'android') {
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-          {
-            title: 'Storage Permission',
-            message: 'This app needs access to storage to save PDF files.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
-        return granted === PermissionsAndroid.RESULTS.GRANTED;
-      } catch (err) {
-        // console.warn(err);
-        return false;
+    try {
+      // Use the improved permission service that handles different Android versions
+      const hasPermission = await permissionService.requestDownloadPermissions();
+      
+      if (!hasPermission) {
+        console.warn('Download permission denied');
       }
+      
+      return hasPermission;
+    } catch (error) {
+      console.error('Error requesting download permissions:', error);
+      return false;
     }
-    return true; // iOS doesn't need explicit permission for this
   };
 
-  const savePdfToDevice = async (pdfContent: string, fileName: string) => {
+  const savePdfToDevice = async (htmlContent: string, fileName: string) => {
     try {
-      // For now, we'll use a simple approach that works with react-native-html-to-pdf
-      // In a real implementation, you'd want to use react-native-fs for better file handling
+      console.log('Starting PDF generation and save process...');
       
-      // Create a temporary file path
-      const filePath = `/storage/emulated/0/Download/${fileName}`;
+      // Configure PDF generation options
+      const options = {
+        html: htmlContent,
+        fileName: fileName.replace('.pdf', ''), // Remove .pdf extension as library adds it
+        directory: Platform.OS === 'android' ? 'Download' : 'Documents',
+        width: 612,
+        height: 792,
+        base64: false,
+        padding: 24,
+      };
+
+      console.log('PDF options:', options);
+
+      // Generate PDF using react-native-html-to-pdf
+      const pdf = await RNHTMLtoPDF.convert(options);
       
-      // For demonstration, we'll show success
-      // In a real app, you'd write the PDF content to the file
-      // console.log('PDF would be saved to:', filePath);
-      
-      return true;
+      console.log('PDF generated successfully:', pdf);
+
+      if (pdf.filePath) {
+        // For Android, try to move the file to the Downloads folder for better accessibility
+        if (Platform.OS === 'android') {
+          try {
+            const downloadDir = RNFS.DownloadDirectoryPath;
+            const finalPath = `${downloadDir}/${fileName}`;
+            
+            console.log('Moving PDF from:', pdf.filePath);
+            console.log('Moving PDF to:', finalPath);
+            
+            // Copy the file to Downloads folder
+            await RNFS.copyFile(pdf.filePath, finalPath);
+            
+            // Clean up the original file
+            await RNFS.unlink(pdf.filePath);
+            
+            console.log('PDF successfully moved to Downloads folder:', finalPath);
+            return { success: true, filePath: finalPath };
+          } catch (moveError) {
+            console.log('Could not move to Downloads, file saved at:', pdf.filePath);
+            // If moving fails, the file is still saved in the app directory
+            return { success: true, filePath: pdf.filePath };
+          }
+        } else {
+          // For iOS, the file is already in the correct location
+          console.log('PDF saved successfully for iOS:', pdf.filePath);
+          return { success: true, filePath: pdf.filePath };
+        }
+      } else {
+        console.error('PDF generation failed: No file path returned');
+        return { success: false, error: 'PDF generation failed' };
+      }
     } catch (error) {
-      // console.error('Error saving PDF:', error);
-      return false;
+      console.error('Error saving PDF:', error);
+      return { success: false, error: error.message || 'Unknown error' };
     }
   };
 
@@ -368,34 +406,38 @@ export const ExpenseDetailsScreen: React.FC = () => {
         items: expense.items,
       };
 
-      // Generate PDF using the generateExpensePdf function
-      const pdfContent = generateExpensePdf(expenseData);
-      
-      // Simulate PDF generation delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Generate PDF HTML content using the enhanced PDF generator
+      const htmlContent = generateEnhancedExpensePdf(expenseData);
       
       // Generate filename
       const fileName = `Expense_Report_${expense.reportHeaderId}_${new Date().getTime()}.pdf`;
 
-      // Save PDF to device
-      const saved = await savePdfToDevice(pdfContent, fileName);
+      console.log('Generated HTML content length:', htmlContent.length);
+      console.log('Saving PDF with filename:', fileName);
 
-      if (saved) {
+      // Save PDF to device
+      const result = await savePdfToDevice(htmlContent, fileName);
+
+      if (result.success) {
+        const locationMessage = Platform.OS === 'android' 
+          ? 'Downloads folder' 
+          : 'Documents folder';
+          
         showBanner(
           'success',
           'PDF Downloaded Successfully',
-          `Your expense report has been saved as ${fileName}`,
+          `Your expense report has been saved to ${locationMessage}`,
           () => {
             Alert.alert(
               'Download Complete', 
-              `The PDF has been saved to your Downloads folder as ${fileName}`,
+              `The PDF has been saved to your device's ${locationMessage} as ${fileName}\n\nPath: ${result.filePath}`,
               [{ text: 'OK' }]
             );
           },
-          'View File'
+          'View Details'
         );
       } else {
-        throw new Error('Failed to save PDF');
+        throw new Error(result.error || 'Failed to save PDF to device');
       }
       
     } catch (error) {

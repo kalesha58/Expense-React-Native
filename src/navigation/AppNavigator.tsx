@@ -35,10 +35,17 @@ export type RootStackParamList = {
       items: Array<{
         description: string;
         price: number;
+        quantity?: number;
       }>;
       total_amount?: number;
       expense_type?: string;
+      Expense_Type?: string;
+      from_location?: string | null;
+      to_location?: string | null;
+      check_in_date?: string;
+      check_out_date?: string;
     };
+    startExtractionInBackground?: boolean;
   } | undefined;
   LineItemEntry: {
     onSave?: (lineItem: any) => void;

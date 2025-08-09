@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AsyncStorageService, type LineItem, type ExpenseHeader } from '../services/asyncStorage';
+import { AsyncStorageService, type LineItem, type ExpenseHeader, type ItemizedEntry } from '../services/asyncStorage';
 import { push, navigate } from '../utils/NavigationUtils';
 import { createExpenseTransaction, validateExpenseData, type CreateExpenseResponse } from '../services/expenseTransactionService';
 import { PayloadBuilder } from '../services/payloadBuilder';
@@ -28,6 +28,10 @@ interface LineItemData {
   supplier: string;
   comment: string;
   itemize?: boolean;
+  // Dynamic fields based on expense type
+  toLocation?: string;
+  dailyRates?: string;
+  numberOfDays?: string;
 }
 
 interface ExpenseFormData {
@@ -325,26 +329,39 @@ export const useExpenseForm = () => {
     });
     
     try {
-      // Convert form data to line items
-      const lineItems: LineItem[] = formData.lineItems.map(item => ({
-        id: item.id,
-        receipt: item.receiptFiles.length > 0 ? item.receiptFiles[0].uri : undefined,
-        amount: parseFloat(item.amount),
-        currency: item.currency,
-        expenseType: item.expenseType,
-        date: item.date.toISOString(),
-        location: item.location,
-        supplier: item.supplier,
-        comment: item.comment,
-        itemized: item.itemize ? [] : undefined,
-        // Map new fields for payload
-        itemDescription: item.expenseType,
-        startDate: item.date.toISOString().split('T')[0],
-        numberOfDays: '1',
-        justification: item.comment,
-        toLocation: '',
-        merchantName: item.supplier,
-        dailyRates: null,
+      // Convert form data to line items and load itemized data
+      const lineItems: LineItem[] = await Promise.all(formData.lineItems.map(async (item) => {
+        // Load itemized data from AsyncStorage if itemization is enabled
+        let itemizedEntries: ItemizedEntry[] = [];
+        if (item.itemize) {
+          try {
+            itemizedEntries = await AsyncStorageService.getItemizedExpenses(item.id);
+            console.log(`📋 Loaded ${itemizedEntries.length} itemized entries for line item ${item.id}`);
+          } catch (error) {
+            console.error(`❌ Error loading itemized data for line item ${item.id}:`, error);
+          }
+        }
+
+        return {
+          id: item.id,
+          receipt: item.receiptFiles.length > 0 ? item.receiptFiles[0].uri : undefined,
+          amount: parseFloat(item.amount),
+          currency: item.currency,
+          expenseType: item.expenseType,
+          date: item.date.toISOString(),
+          location: item.location,
+          supplier: item.supplier,
+          comment: item.comment,
+          itemized: item.itemize ? itemizedEntries : undefined,
+          // Map dynamic fields from LineItemData
+          itemDescription: item.expenseType,
+          startDate: item.date.toISOString().split('T')[0],
+          numberOfDays: item.numberOfDays || '1',
+          justification: item.comment,
+          toLocation: item.toLocation || '',
+          merchantName: item.supplier,
+          dailyRates: item.dailyRates ? parseFloat(item.dailyRates) : null,
+        };
       }));
 
       const headerData: ExpenseHeader = {
@@ -386,7 +403,9 @@ export const useExpenseForm = () => {
       console.log('Create Expense Payload:', JSON.stringify(payload, null, 2));
 
       // Call the API to create expense (using existing service for now)
+      console.log('🎯 DEBUG: About to call createExpenseTransaction...');
       const response: CreateExpenseResponse = await createExpenseTransaction();
+      console.log('🎯 DEBUG: createExpenseTransaction completed with response:', response);
       
       // Show banner with API response for 3 seconds
       const bannerMessage = response.ReturnStatus === 'S' 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert } from 'react-native';
 import { ExpenseDetail } from '../../hooks/useExpenseDetails';
+import { ExpenseType } from '../../types/ExpenseTypes';
 
 interface GroupedExpenseDetail {
   reportHeaderId: string;
@@ -274,12 +275,74 @@ export const PdfGenerator: React.FC<PdfGeneratorProps> = ({ expense, onDownload 
   return null; // This component doesn't render anything visible
 };
 
+// Helper function to categorize expenses dynamically
+const categorizeExpense = (expenseType: string): string => {
+  const type = expenseType.toLowerCase();
+  
+  // Travel & Transportation
+  if (type.includes('airfare') || type.includes('flight') || type.includes('air')) {
+    return 'travel';
+  }
+  if (type.includes('car rental') || type.includes('cab') || type.includes('transportation')) {
+    return 'travel';
+  }
+  
+  // Lodging & Accommodation
+  if (type.includes('hotel') || type.includes('accommodation') || type.includes('lodging')) {
+    return 'lodging';
+  }
+  
+  // Fuel & Gas
+  if (type.includes('fuel') || type.includes('gas') || type.includes('petrol')) {
+    return 'fuel';
+  }
+  
+  // Meals & Food
+  if (type.includes('meal') || type.includes('food') || type.includes('dining') || 
+      type.includes('breakfast') || type.includes('lunch') || type.includes('dinner')) {
+    return 'meals';
+  }
+  
+  // Default to other
+  return 'other';
+};
+
+// Helper function to get category icon
+const getCategoryIcon = (category: string): string => {
+  switch (category) {
+    case 'travel': return '✈️';
+    case 'lodging': return '🏨';
+    case 'fuel': return '⛽';
+    case 'meals': return '🍽️';
+    default: return '📋';
+  }
+};
+
+// Helper function to get category color
+const getCategoryColor = (category: string): string => {
+  switch (category) {
+    case 'travel': return '#3498db';
+    case 'lodging': return '#9b59b6';
+    case 'fuel': return '#e74c3c';
+    case 'meals': return '#f39c12';
+    default: return '#95a5a6';
+  }
+};
+
 // Export the function for direct use
 export const generateExpensePdf = (expense: GroupedExpenseDetail): string => {
-  const currentDate = new Date().toLocaleDateString();
-  const currentTime = new Date().toLocaleTimeString();
+  const currentDate = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  const currentTime = new Date().toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
   
-  // Calculate totals for different categories
+  // Calculate totals for different categories using dynamic categorization
   const categoryTotals = {
     travel: 0,
     lodging: 0,
@@ -289,24 +352,24 @@ export const generateExpensePdf = (expense: GroupedExpenseDetail): string => {
     total: 0
   };
   
-  // Categorize expenses based on item names or descriptions
+  // Group items by category
+  const categorizedItems: { [key: string]: ExpenseDetail[] } = {
+    travel: [],
+    lodging: [],
+    fuel: [],
+    meals: [],
+    other: []
+  };
+  
+  // Categorize expenses using dynamic logic
   expense.items.forEach(item => {
     const amount = parseFloat(item.Amount);
-    const itemName = item.ExpenseItem.toLowerCase();
+    const category = categorizeExpense(item.ExpenseItem);
     
-    if (itemName.includes('travel') || itemName.includes('flight') || itemName.includes('airfare')) {
-      categoryTotals.travel += amount;
-    } else if (itemName.includes('lodging') || itemName.includes('hotel') || itemName.includes('accommodation')) {
-      categoryTotals.lodging += amount;
-    } else if (itemName.includes('fuel') || itemName.includes('gas') || itemName.includes('petrol')) {
-      categoryTotals.fuel += amount;
-    } else if (itemName.includes('meal') || itemName.includes('food') || itemName.includes('dining')) {
-      categoryTotals.meals += amount;
-    } else {
-      categoryTotals.other += amount;
-    }
-    
+    categoryTotals[category as keyof typeof categoryTotals] += amount;
     categoryTotals.total += amount;
+    
+    categorizedItems[category].push(item);
   });
   
   // Generate HTML content that can be converted to PDF

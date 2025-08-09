@@ -17,7 +17,7 @@ import Feather from 'react-native-vector-icons/Feather';
 import { useTheme } from '../hooks/useTheme';
 import { SIZES } from '../constants/theme';
 import { navigate } from '../utils/NavigationUtils';
-import { extractReceiptData, showExtractionSuccess } from '../utils/receiptUtils';
+import { extractReceiptData } from '../utils/receiptUtils';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -109,42 +109,14 @@ export const CameraScreen: React.FC<ICameraScreenProps> = ({ onImageCaptured }) 
   const handleUseImage = async () => {
     if (!capturedImage) return;
     
-    try {
-      console.log('🎯 User clicked "Use Image" - starting extraction process...');
-      setIsExtracting(true);
-      
-      // Extract receipt data from the captured image
-      console.log('🔍 Calling extractReceiptData with image:', capturedImage);
-      const extractedData = await extractReceiptData(capturedImage);
-      
-      if (extractedData) {
-        console.log('✅ Extraction successful! Data:', extractedData);
-        // Show success message
-        showExtractionSuccess(extractedData);
-        
-        // Navigate to expense creation with both image and extracted data
-        console.log('🧭 Navigating to CreateExpense with extracted data');
-        navigate('CreateExpense', { 
-          receiptImage: capturedImage,
-          extractedData: extractedData
-        });
-      } else {
-        console.log('❌ Extraction failed or returned null');
-        // Navigate with just the image if extraction failed
-        console.log('🧭 Navigating to CreateExpense with image only');
-        navigate('CreateExpense', { 
-          receiptImage: capturedImage 
-        });
-      }
-    } catch (error) {
-      console.error('Error during receipt extraction:', error);
-      // Navigate with just the image if extraction failed
-      navigate('CreateExpense', { 
-        receiptImage: capturedImage 
-      });
-    } finally {
-      setIsExtracting(false);
-    }
+    console.log('🎯 User clicked "Use Image" - navigating directly to CreateExpense');
+    
+    // Navigate immediately to CreateExpense with the image
+    // Extraction will happen in the background with banner
+    navigate('CreateExpense', { 
+      receiptImage: capturedImage,
+      startExtractionInBackground: true
+    });
   };
 
   const handleClose = () => {

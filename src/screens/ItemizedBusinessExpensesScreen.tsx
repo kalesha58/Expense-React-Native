@@ -19,6 +19,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Dropdown } from '../components/ui/Dropdown';
 import { DatePicker } from '../components/ui/DatePicker';
+import { Banner } from '../components/ui/Banner';
 import { SIZES } from '../constants/theme';
 import { ItemizedExpenseFormModal } from '../components/expenses';
 import { AsyncStorageService } from '../services/asyncStorage';
@@ -43,6 +44,15 @@ interface IRouteParams {
   lineItemId?: string;
   onItemizedUpdate?: (count: number) => void;
   onAmountUpdate?: (newAmount: number) => void;
+  // New fields for extracted data auto-fill
+  extractedItems?: Array<{
+    description: string;
+    price: number;
+    quantity?: number;
+  }>;
+  extractedExpenseType?: string;
+  extractedDate?: Date;
+  extractedLocation?: string;
 }
 
 export const ItemizedBusinessExpensesScreen: React.FC = () => {
@@ -61,6 +71,12 @@ export const ItemizedBusinessExpensesScreen: React.FC = () => {
   const lineItemId = params?.lineItemId || '';
   const onItemizedUpdate = params?.onItemizedUpdate;
   const onAmountUpdate = params?.onAmountUpdate;
+  
+  // Extract auto-fill data
+  const extractedItems = params?.extractedItems || [];
+  const extractedExpenseType = params?.extractedExpenseType;
+  const extractedDate = params?.extractedDate;
+  const extractedLocation = params?.extractedLocation;
 
   // Debug logging
   console.log('🔍 ItemizedBusinessExpensesScreen Debug:', {
@@ -68,13 +84,19 @@ export const ItemizedBusinessExpensesScreen: React.FC = () => {
     mainExpense,
     lineItemId,
     hasUpdateCallback: !!onItemizedUpdate,
-    hasAmountUpdateCallback: !!onAmountUpdate
+    hasAmountUpdateCallback: !!onAmountUpdate,
+    extractedItemsCount: extractedItems.length,
+    extractedExpenseType,
+    extractedDate,
+    extractedLocation
   });
 
   const [itemizedExpenses, setItemizedExpenses] = useState<IItemizedExpense[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingItem, setEditingItem] = useState<IItemizedExpense | undefined>(undefined);
+  const [hasAutoPopulated, setHasAutoPopulated] = useState(false);
+  const [showAutoPopulatedBanner, setShowAutoPopulatedBanner] = useState(false);
 
   // Load existing itemized expenses when screen loads
   useEffect(() => {
@@ -110,6 +132,49 @@ export const ItemizedBusinessExpensesScreen: React.FC = () => {
 
     loadExistingItemizedExpenses();
   }, [lineItemId, mainExpense.currency]);
+
+  // Auto-populate itemized expenses from extracted data
+  useEffect(() => {
+    const autoPopulateFromExtractedData = async () => {
+      console.log('🤖 Checking for extracted items to auto-populate:', {
+        extractedItemsCount: extractedItems.length,
+        hasExistingItems: itemizedExpenses.length > 0
+      });
+
+      // Only auto-populate if we have extracted data and no existing itemized expenses
+      if (extractedItems.length > 0 && itemizedExpenses.length === 0) {
+        console.log('✨ Auto-populating itemized expenses from extracted data');
+        
+        const autoPopulatedItems: IItemizedExpense[] = extractedItems.map((item, index) => ({
+          id: `auto_${Date.now()}_${index}`,
+          amount: item.price.toString(), // price → amount
+          currency: mainExpense.currency,
+          expenseType: extractedExpenseType || 'Business Meal', // Use extracted expense type
+          date: extractedDate || new Date(), // Use extracted date
+          location: extractedLocation || '', // Use extracted location
+          supplier: item.description, // description → supplier
+          comment: item.quantity ? `Quantity: ${item.quantity}` : '', // Optional quantity info in comment
+        }));
+
+        console.log('📋 Auto-populated items:', autoPopulatedItems);
+        setItemizedExpenses(autoPopulatedItems);
+        
+        // Set flags to show user that data was auto-populated
+        setHasAutoPopulated(true);
+        setShowAutoPopulatedBanner(true);
+
+        // Update the itemized count
+        if (onItemizedUpdate) {
+          onItemizedUpdate(autoPopulatedItems.length);
+        }
+      }
+    };
+
+    // Run auto-population after existing data is loaded
+    if (lineItemId) {
+      autoPopulateFromExtractedData();
+    }
+  }, [extractedItems, extractedExpenseType, extractedDate, extractedLocation, itemizedExpenses.length, mainExpense.currency, onItemizedUpdate, lineItemId]);
 
   // Sync amount when user navigates back (on screen focus/blur)
   useEffect(() => {
@@ -160,7 +225,22 @@ export const ItemizedBusinessExpensesScreen: React.FC = () => {
   };
 
   const handleAddItemizedExpense = () => {
-    setEditingItem(undefined);
+    // Pre-populate new item with extracted data if available
+    if (extractedItems.length > 0 && extractedExpenseType) {
+      const preFilledItem: IItemizedExpense = {
+        id: `new_${Date.now()}`,
+        amount: '',
+        currency: mainExpense.currency,
+        expenseType: extractedExpenseType,
+        date: extractedDate || new Date(),
+        location: extractedLocation || '',
+        supplier: '',
+        comment: '',
+      };
+      setEditingItem(preFilledItem);
+    } else {
+      setEditingItem(undefined);
+    }
     setShowFormModal(true);
   };
 
@@ -474,9 +554,16 @@ export const ItemizedBusinessExpensesScreen: React.FC = () => {
                   activeOpacity={0.7}
                 >
                   <View style={styles.itemizedHeader}>
-                    <Text style={[styles.itemNumber, { color: colors.text }]}>
-                      Item {index + 1}
-                    </Text>
+                    <View style={styles.itemNumberContainer}>
+                      <Text style={[styles.itemNumber, { color: colors.text }]}>
+                        Item {index + 1}
+                      </Text>
+                      {hasAutoPopulated && item.id.startsWith('auto_') && (
+                        <View style={[styles.autoFillBadge, { backgroundColor: '#3B82F6' }]}>
+                          <Text style={styles.autoFillBadgeText}>Auto-filled</Text>
+                        </View>
+                      )}
+                    </View>
                     <View style={styles.itemActions}>
                       <TouchableOpacity
                         onPress={() => handleEditItemizedExpense(item)}
@@ -587,6 +674,19 @@ export const ItemizedBusinessExpensesScreen: React.FC = () => {
         }}
         onSave={handleSaveItemFromModal}
         editItem={editingItem}
+      />
+
+      {/* Auto-Population Notification Banner */}
+      <Banner
+        visible={showAutoPopulatedBanner}
+        type="info"
+        title="Items Auto-Filled"
+        message={`${extractedItems.length} items were automatically filled from your receipt. Review and edit as needed.`}
+        onClose={() => setShowAutoPopulatedBanner(false)}
+        actionText="Got it"
+        onAction={() => setShowAutoPopulatedBanner(false)}
+        autoHide={true}
+        duration={6000}
       />
     </SafeAreaView>
   );
@@ -838,5 +938,21 @@ const styles = StyleSheet.create({
   saveButton: {
     flex: 1,
     marginBottom: 0,
+  },
+  itemNumberContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  autoFillBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  autoFillBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    textTransform: 'uppercase',
   },
 });

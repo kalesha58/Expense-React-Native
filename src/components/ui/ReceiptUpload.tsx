@@ -127,15 +127,42 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
       // Calling receipt extraction API...
       const extractionResult = await receiptExtractionAPI.extractReceiptDetails(base64Result.base64);
       
-      // Calling onExtractionComplete callback
-      if (onExtractionComplete) {
-        onExtractionComplete(extractionResult);
+      // Show different popup based on item count and handle auto-save
+      if (extractionResult.items.length > 1) {
+        Alert.alert(
+          'Itemized Items Found!', 
+          `Found ${extractionResult.items.length} items in your receipt:\n\nBusiness: ${extractionResult.business_name}\n\nItemization will be enabled automatically. Click OK to save the itemized data.`,
+          [{ 
+            text: 'OK',
+            onPress: () => {
+              console.log('🔥 User acknowledged itemized extraction - triggering auto-save...');
+              // Call onExtractionComplete with user acknowledgment after user clicks OK
+              if (onExtractionComplete) {
+                // Add a flag to indicate user acknowledged the itemized data
+                const extractionWithAcknowledgment = {
+                  ...extractionResult,
+                  userAcknowledgedItemization: true
+                };
+                onExtractionComplete(extractionWithAcknowledgment);
+              }
+            }
+          }]
+        );
+      } else {
+        Alert.alert(
+          'Receipt Extracted!', 
+          `Successfully extracted data from receipt:\n\nBusiness: ${extractionResult.business_name}\nItems: ${extractionResult.items.length} found`,
+          [{ 
+            text: 'OK',
+            onPress: () => {
+              // Call onExtractionComplete for single item (no auto-save needed)
+              if (onExtractionComplete) {
+                onExtractionComplete(extractionResult);
+              }
+            }
+          }]
+        );
       }
-      
-      Alert.alert(
-        'Receipt Extracted!', 
-        `Successfully extracted data from receipt:\n\nBusiness: ${extractionResult.business_name}\nItems: ${extractionResult.items.length} found`
-      );
       
     } catch (error) {
       // Receipt extraction error
@@ -186,7 +213,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
     launchCamera(
       {
         ...imagePickerOptions,
-        quality: 'high', // Fix: quality should be 'high' | 'medium' | 'low' | undefined
+        quality: 0.8, // Fix: quality should be a number between 0 and 1
       },
       handleImagePickerResponse
     );
@@ -200,7 +227,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
       {
         ...imagePickerOptions,
         selectionLimit: 5, // Allow multiple selection
-        quality: 'high', // Fix: quality should be 'high' | 'medium' | 'low' | undefined
+        quality: 0.8, // Fix: quality should be a number between 0 and 1
       },
       handleImagePickerResponse
     );

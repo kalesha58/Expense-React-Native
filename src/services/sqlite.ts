@@ -20,15 +20,12 @@ export const insertExpense = async (
   }>
 ): Promise<void> => {
   try {
+    // Inserting expense
     // TODO: Implement actual SQLite database operations
-    console.log('Inserting expense:', { header, lineItems });
-    
-    // Simulate database operation
     await new Promise(resolve => setTimeout(resolve, 500));
-    
-    console.log('Expense saved successfully');
+    // Expense saved successfully
   } catch (error) {
-    console.error('Failed to insert expense:', error);
+    // Failed to insert expense
     throw error;
   }
 }; 

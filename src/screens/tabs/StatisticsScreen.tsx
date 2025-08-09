@@ -251,12 +251,6 @@ export const StatisticsScreen: React.FC = () => {
     // Use real expense details data
     const dataToProcess = expenseDetails || [];
     
-    console.log('Processing real expense data (using TransactionDate):', {
-      dataToProcessCount: dataToProcess.length,
-      selectedYear,
-      selectedMonth
-    });
-
     if (!dataToProcess || dataToProcess.length === 0) {
       return {
         totalAmount: 0,
@@ -309,31 +303,17 @@ export const StatisticsScreen: React.FC = () => {
         
         // Check if date is valid
         if (isNaN(expenseDate.getTime())) {
-          console.warn('Invalid date after parsing:', expense.TransactionDate);
           return false;
         }
         
         const expenseYear = expenseDate.getFullYear().toString();
         const expenseMonth = expenseDate.toLocaleString('en-US', { month: 'long' });
         
-        console.log('Date parsing result:', {
-          original: expense.TransactionDate,
-          parsed: expenseDate.toISOString(),
-          year: expenseYear,
-          month: expenseMonth,
-          selectedYear,
-          selectedMonth,
-          matches: expenseYear === selectedYear && expenseMonth === selectedMonth
-        });
-        
         return expenseYear === selectedYear && expenseMonth === selectedMonth;
       } catch (error) {
-        console.warn('Error parsing TransactionDate:', expense.TransactionDate, error);
         return false;
       }
     });
-
-    console.log('Filtered data count:', filteredData.length);
 
     // Group expenses by status
     const statusMap = new Map<string, StatusData>();
@@ -375,11 +355,7 @@ export const StatisticsScreen: React.FC = () => {
       legendFontSize: 12,
     })).filter(item => item.population > 0); // Only include items with positive values
 
-    console.log('Final statistics:', {
-      totalAmount,
-      statusesCount: statuses.length,
-      chartDataCount: chartData.length
-    });
+
 
     return {
       totalAmount,

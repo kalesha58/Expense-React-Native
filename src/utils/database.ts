@@ -147,8 +147,6 @@ class DatabaseManager {
       }
 
       // Simplified console log for database insertion
-      console.log(`Database: Data inserted into ${tableName} - ${insertedCount} records`);
-      
       logger.info('Data inserted successfully', { 
         tableName, 
         insertedCount,
@@ -262,6 +260,36 @@ class DatabaseManager {
     } catch (error) {
       logger.error('Failed to execute raw SQL', { sql, error });
       throw new Error(`Failed to execute SQL: ${error}`);
+    }
+  }
+
+  /**
+   * Get expense items from expense_items table
+   */
+  async getExpenseItems(): Promise<any[]> {
+    try {
+      logger.info('Fetching expense items from database...');
+      
+      // Check if table exists first
+      const tableExists = await this.tableExists('expense_items');
+      if (!tableExists) {
+        logger.warn('expense_items table does not exist');
+        return [];
+      }
+      
+      // Query all expense items
+      const items = await this.queryData('expense_items');
+      
+      logger.info('Expense items fetched successfully', { 
+        count: items.length,
+        sampleItem: items.length > 0 ? items[0] : null 
+      });
+      
+      return items;
+    } catch (error) {
+      logger.error('Failed to fetch expense items', { error });
+      // Return empty array instead of throwing to prevent app crashes
+      return [];
     }
   }
 }

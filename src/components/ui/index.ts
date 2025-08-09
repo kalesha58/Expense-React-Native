@@ -7,4 +7,11 @@ export { ImageSlider } from './ImageSlider';
 export { AttachmentCarousel } from './AttachmentCarousel';
 export { ReceiptUpload } from './ReceiptUpload';
 export { PdfGenerator, generateExpensePdf } from './PdfGenerator';
+export { 
+  SkeletonLoader, 
+  ExpenseCardSkeleton, 
+  TabHeaderSkeleton, 
+  ExpenseListSkeleton, 
+  SearchResultSkeleton 
+} from './SkeletonLoader';
 export { Banner } from './Banner';

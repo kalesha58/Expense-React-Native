@@ -8,11 +8,15 @@ import ActivityScreen from '../screens/ActivityScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import AboutScreen from '../screens/AboutScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import AccountScreen from '../screens/AccountScreen';
+
 import { CreateExpenseScreen } from '../screens/CreateExpenseScreen';
 import { ExpenseDetailsScreen } from '../screens/ExpenseDetailsScreen';
+import { LineItemDetailsScreen } from '../screens/LineItemDetailsScreen';
 import { LineItemEntryScreen } from '../screens/LineItemEntryScreen';
 import { ExpenseTypeSelectionScreen } from '../screens/ExpenseTypeSelectionScreen';
+import { ItemizedBusinessExpensesScreen } from '../screens/ItemizedBusinessExpensesScreen';
+import { StatisticsScreen } from '../screens/StatisticsScreen';
+import { CameraScreen } from '../screens/CameraScreen';
 import { navigationRef } from '../utils/NavigationUtils';
 import { ExpenseDetail } from '../hooks/useExpenseDetails';
 
@@ -24,8 +28,18 @@ export type RootStackParamList = {
   Dashboard: undefined;
   About: undefined;
   Profile: undefined;
-  Account: undefined;
-  CreateExpense: undefined;
+  CreateExpense: {
+    receiptImage?: string;
+    extractedData?: {
+      business_name: string;
+      items: Array<{
+        description: string;
+        price: number;
+      }>;
+      total_amount?: number;
+      expense_type?: string;
+    };
+  } | undefined;
   LineItemEntry: {
     onSave?: (lineItem: any) => void;
     editMode?: boolean;
@@ -45,6 +59,21 @@ export type RootStackParamList = {
       status: 'approved' | 'pending' | 'rejected';
       items: ExpenseDetail[];
     };
+  };
+  LineItemDetails: {
+    lineItem: ExpenseDetail;
+    itemizedGroup?: any[];
+  };
+  ItemizedBusinessExpenses: {
+    mainExpense?: {
+      name: string;
+      receiptAmount: number;
+      currency: string;
+    };
+  };
+  Statistics: undefined;
+  Camera: {
+    onImageCaptured?: (imageUri: string) => void;
   };
 
 };
@@ -67,11 +96,14 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="About" component={AboutScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
-        <Stack.Screen name="Account" component={AccountScreen} />
         <Stack.Screen name="CreateExpense" component={CreateExpenseScreen} />
         <Stack.Screen name="LineItemEntry" component={LineItemEntryScreen} />
         <Stack.Screen name="ExpenseTypeSelection" component={ExpenseTypeSelectionScreen} />
         <Stack.Screen name="ExpenseDetails" component={ExpenseDetailsScreen} />
+        <Stack.Screen name="LineItemDetails" component={LineItemDetailsScreen} />
+        <Stack.Screen name="ItemizedBusinessExpenses" component={ItemizedBusinessExpensesScreen} />
+        <Stack.Screen name="Statistics" component={StatisticsScreen} />
+        <Stack.Screen name="Camera" component={CameraScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

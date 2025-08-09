@@ -58,18 +58,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
     try {
       bottomSheetModalRef.current?.present();
     } catch (error) {
-      console.error('Error presenting bottom sheet:', error);
-      // Fallback to alert if bottom sheet fails
-      Alert.alert(
-        'Upload Options',
-        'Choose an option:',
-        [
-          { text: 'Camera', onPress: () => Alert.alert('Info', 'Camera functionality temporarily disabled') },
-          { text: 'Gallery', onPress: () => Alert.alert('Info', 'Gallery functionality temporarily disabled') },
-          { text: 'Document', onPress: () => Alert.alert('Info', 'Document picker functionality temporarily disabled') },
-          { text: 'Cancel', style: 'cancel' }
-        ]
-      );
+      // Error presenting bottom sheet
     }
   }, []);
 
@@ -77,12 +66,12 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
     try {
       bottomSheetModalRef.current?.dismiss();
     } catch (error) {
-      console.error('Error dismissing bottom sheet:', error);
+      // Error dismissing bottom sheet
     }
   }, []);
 
   const handleSheetChanges = useCallback((index: number) => {
-    console.log('handleSheetChanges', index);
+    // handleSheetChanges
   }, []);
 
   const renderBackdrop = useCallback(
@@ -132,21 +121,14 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
         return;
       }
       
-      console.log('File size validation passed');
-      
-      // Convert to base64
-      console.log('Converting image to base64...');
+      // Converting image to base64...
       const base64Result = await convertImageToBase64(fileUri);
-      console.log('Base64 conversion completed, length:', base64Result.base64.length);
       
-      // Call extraction API
-      console.log('Calling receipt extraction API...');
+      // Calling receipt extraction API...
       const extractionResult = await receiptExtractionAPI.extractReceiptDetails(base64Result.base64);
-      console.log('Extraction API response:', extractionResult);
       
-      // Call the callback with extraction results
+      // Calling onExtractionComplete callback
       if (onExtractionComplete) {
-        console.log('Calling onExtractionComplete callback');
         onExtractionComplete(extractionResult);
       }
       
@@ -156,20 +138,20 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
       );
       
     } catch (error) {
-      console.error('Receipt extraction error:', error);
+      // Receipt extraction error
       Alert.alert(
         'Extraction Failed', 
         error instanceof Error ? error.message : 'Failed to extract receipt details. Please try again.'
       );
     } finally {
-      console.log('Setting isExtracting to false');
+      // Setting isExtracting to false
       setIsExtracting(false);
     }
   }, [onExtractionComplete]);
 
   // Handle image picker response
   const handleImagePickerResponse = useCallback((response: ImagePickerResponse) => {
-    console.log('Image picker response:', response);
+    // Image picker response
     
     if (response.didCancel || response.errorMessage) {
       if (response.errorMessage) {
@@ -185,8 +167,7 @@ export const ReceiptUpload: React.FC<ReceiptUploadProps> = ({
         mimeType: asset.type || 'image/jpeg',
       })).filter(file => file.uri !== '');
 
-      console.log('New files to add:', newFiles);
-
+      // New files to add
       if (newFiles.length > 0) {
         onChange([...value, ...newFiles]);
         

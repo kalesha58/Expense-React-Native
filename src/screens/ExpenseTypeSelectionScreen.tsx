@@ -40,7 +40,6 @@ export const ExpenseTypeSelectionScreen: React.FC = () => {
 
   // Generate options from expense items
   const generateOptions = (): ExpenseTypeOption[] => {
-    console.log('Generating options from expense items:', expenseItems);
     
     if (expenseItems.length > 0) {
       // Use all expense items individually (no grouping)
@@ -71,22 +70,21 @@ export const ExpenseTypeSelectionScreen: React.FC = () => {
 
   // Filter options based on search query
   useEffect(() => {
-    const options = generateOptions();
-    console.log('Generated expense type options:', options.length);
-    console.log('Unique expense types:', options.map(opt => opt.value));
-    
-    if (searchQuery.trim() === '') {
+    if (expenseItems && expenseItems.length > 0) {
+      // Generating options from expense items
+      const uniqueTypes = [...new Set(expenseItems.map(item => item.expenseItem))];
+      const options = uniqueTypes.map((type, index) => ({
+        id: index.toString(),
+        label: type,
+        value: type,
+      }));
       setFilteredOptions(options);
-    } else {
-      const filtered = options.filter(option =>
-        option.label.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredOptions(filtered);
+      // Generated expense type options
+      // Unique expense types
     }
-  }, [searchQuery, expenseItems]);
+  }, [expenseItems]);
 
   const handleSelectExpenseType = (expenseType: string) => {
-    console.log('Expense type selected:', expenseType);
     if (params?.onSelect) {
       params.onSelect(expenseType);
     }

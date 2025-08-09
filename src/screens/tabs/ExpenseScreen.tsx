@@ -13,7 +13,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { Header } from '../../components/layout/Header';
 import { 
   ExpenseTabView,
-  SearchBar, 
+  SearchModal, 
   EmptyState, 
   type GroupedExpenseItem
 } from '../../components/expenses';
@@ -41,6 +41,9 @@ const transformExpenseDetailsToGroups = (expenseDetails: ExpenseDetail[]): Group
   return Array.from(groupedMap.entries()).map(([reportHeaderId, items]) => {
     // Calculate total amount for the group
     const totalAmount = items.reduce((sum, item) => sum + (parseFloat(item.Amount) || 0), 0);
+    
+    // Calculate parent items count (items with ItemizationParentId: "-1")
+    const parentItemsCount = items.filter(item => item.ItemizationParentId === '-1').length;
     
     // Determine the most critical status (rejected > pending > approved)
     const statusCounts = {
@@ -71,19 +74,20 @@ const transformExpenseDetailsToGroups = (expenseDetails: ExpenseDetail[]): Group
     // Use the first item for common report information
     const firstItem = items[0];
     
+
     return {
       id: reportHeaderId,
       reportHeaderId: reportHeaderId,
-      reportName: firstItem.ReportName,
-      reportDate: firstItem.ReportDate,
+      reportName: firstItem.ReportName || `EXP-${reportHeaderId}`,
+      reportDate: firstItem.ReportDate || firstItem.TransactionDate,
       title: firstItem.ReportName || `Expense Report ${reportHeaderId}`,
       amount: totalAmount,
       totalAmount: totalAmount,
       status: groupStatus,
       date: firstItem.TransactionDate,
       items: items,
-      itemCount: items.length,
-      category: items.length > 1 ? `${items.length} Items` : firstItem.ExpenseItem,
+      itemCount: parentItemsCount,
+      category: parentItemsCount > 1 ? `${parentItemsCount} Items` : firstItem.ExpenseItem,
       // Additional fields from the API
       businessPurpose: firstItem.BusinessPurpose,
       departmentCode: firstItem.DepartmentCode,
@@ -111,11 +115,9 @@ export const ExpenseScreen: React.FC = () => {
   console.log('ExpenseScreen - Raw expenseDetails:', expenseDetails);
   
   // State management
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   
-  // Refs for performance
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
 
   // Transform API data to grouped ExpenseItem format
   const allExpenses = useMemo<GroupedExpenseItem[]>(() => {
@@ -125,39 +127,12 @@ export const ExpenseScreen: React.FC = () => {
     return transformed;
   }, [expenseDetails]);
 
-  // Memoized filtered data
-  const filteredExpenses = useMemo(() => {
-    let filtered = allExpenses;
-    
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const searchTerm = searchQuery.toLowerCase();
-      filtered = filtered.filter(expense => 
-        expense.title.toLowerCase().includes(searchTerm) ||
-        expense.reportName.toLowerCase().includes(searchTerm) ||
-        expense.category.toLowerCase().includes(searchTerm) ||
-        expense.businessPurpose?.toLowerCase().includes(searchTerm) ||
-        expense.location?.toLowerCase().includes(searchTerm) ||
-        expense.supplier?.toLowerCase().includes(searchTerm) ||
-        expense.departmentCode?.toLowerCase().includes(searchTerm) ||
-        expense.comments?.toLowerCase().includes(searchTerm) ||
-        expense.currency?.toLowerCase().includes(searchTerm) ||
-        expense.id?.toLowerCase().includes(searchTerm)
-      );
-    }
-    
-    return filtered;
-  }, [allExpenses, searchQuery]);
+
   
-  // Optimized search handler with debouncing
-  const handleSearch = useCallback((text: string) => {
-    setSearchQuery(text);
-    
-    // Clear previous timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-  }, []);
+  // Handle search modal toggle
+  const handleSearchToggle = useCallback(() => {
+    setShowSearchModal(!showSearchModal);
+  }, [showSearchModal]);
   
 
 
@@ -166,9 +141,10 @@ export const ExpenseScreen: React.FC = () => {
   const handleExpensePress = useCallback((id: string) => {
     console.log('Expense pressed with id:', id);
     console.log('Available grouped expenses:', allExpenses.length);
+    console.log('All available IDs:', allExpenses.map(e => ({ id: e.id, reportHeaderId: e.reportHeaderId, reportName: e.reportName })));
     
-    // Find the grouped expense by ReportHeaderId
-    const groupedExpense = allExpenses.find(expense => expense.reportHeaderId === id);
+    // Find the grouped expense by ReportHeaderId or id
+    const groupedExpense = allExpenses.find(expense => expense.reportHeaderId === id || expense.id === id);
     
     console.log('Found groupedExpense:', groupedExpense);
     
@@ -197,15 +173,40 @@ export const ExpenseScreen: React.FC = () => {
     }
   }, [allExpenses, navigation]);
 
-  const handleSearchToggle = useCallback(() => {
-    setShowSearch(!showSearch);
-    if (showSearch) {
-      setSearchQuery('');
+  // Handle search result selection
+  const handleSearchResultSelect = useCallback((expenseId: string) => {
+    console.log('Search result selected:', expenseId);
+    
+    // Find the expense by id (which should match reportHeaderId)
+    const expense = allExpenses.find(e => e.id === expenseId || e.reportHeaderId === expenseId);
+    
+    if (expense) {
+      console.log('Found expense for search result:', expense);
+      
+      // Close the search modal first
+      setShowSearchModal(false);
+      
+      // Use the reportHeaderId to navigate (this is what handleExpensePress expects)
+      const idToUse = expense.reportHeaderId || expense.id;
+      console.log('Navigating with ID:', idToUse);
+      
+      // Small delay to ensure modal closes before navigation
+      setTimeout(() => {
+        handleExpensePress(idToUse);
+      }, 100);
+    } else {
+      console.log('No expense found for search result ID:', expenseId);
+      console.log('Available expenses:', allExpenses.map(e => ({ id: e.id, reportHeaderId: e.reportHeaderId })));
     }
-  }, [showSearch]);
+  }, [allExpenses, handleExpensePress]);
 
   const handleMorePress = useCallback(() => {
     console.log('More options pressed');
+  }, []);
+
+  // Handle search modal close
+  const handleSearchModalClose = useCallback(() => {
+    setShowSearchModal(false);
   }, []);
   
 
@@ -216,45 +217,34 @@ export const ExpenseScreen: React.FC = () => {
         title="Expenses" 
         showThemeToggle={true}
         rightComponent={
-          <TouchableOpacity onPress={handleSearchToggle}>
+          <TouchableOpacity 
+            onPress={handleSearchToggle}
+            style={{ padding: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 6 }}
+          >
             <Feather 
-              name={showSearch ? "x" : "search"} 
+              name="search" 
               size={24} 
-              color={colors.primary} 
+              color={colors.white} 
             />
           </TouchableOpacity>
         }
       />
       
-      {/* Search Bar - Only show when search is active */}
-      {showSearch && (
-        <>
-          <SearchBar
-            value={searchQuery}
-            onChangeText={handleSearch}
-            autoFocus={true}
-          />
-          {searchQuery.trim() && (
-            <View style={[styles.searchResultsInfo, { backgroundColor: colors.card }]}>
-              <Text style={[styles.searchResultsText, { color: colors.placeholder }]}>
-                {filteredExpenses.length} result{filteredExpenses.length !== 1 ? 's' : ''} found
-              </Text>
-              <TouchableOpacity 
-                onPress={() => setSearchQuery('')}
-                style={styles.clearSearchButton}
-              >
-                <Feather name="x" size={16} color={colors.placeholder} />
-              </TouchableOpacity>
-            </View>
-          )}
-        </>
-      )}
-      
       {/* Expense Tab View */}
       <ExpenseTabView
-        expenses={filteredExpenses}
+        expenses={allExpenses}
         onExpensePress={handleExpensePress}
         onMorePress={handleMorePress}
+        isSearchActive={showSearchModal}
+        loading={apiLoading}
+      />
+
+      {/* Search Modal */}
+      <SearchModal
+        visible={showSearchModal}
+        onClose={handleSearchModalClose}
+        expenses={allExpenses}
+        onSelectExpense={handleSearchResultSelect}
       />
       
 
@@ -265,22 +255,5 @@ export const ExpenseScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  searchResultsInfo: {
-    paddingVertical: SIZES.base,
-    paddingHorizontal: SIZES.radius,
-    borderRadius: SIZES.radius,
-    marginTop: SIZES.base,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  searchResultsText: {
-    fontSize: SIZES.font,
-    fontWeight: 'bold',
-    marginRight: SIZES.base,
-  },
-  clearSearchButton: {
-    padding: SIZES.base,
   },
 }); 

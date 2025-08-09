@@ -62,7 +62,7 @@ export const useCreateExpense = (): UseCreateExpenseReturn => {
           try {
             await AsyncStorageService.clearExpenseDraft();
           } catch (error) {
-            console.error('Error clearing expense draft:', error);
+            // Error clearing expense draft
           }
           setBanner({ visible: false, type: 'info', title: '' });
           navigate('Dashboard');
@@ -73,9 +73,9 @@ export const useCreateExpense = (): UseCreateExpenseReturn => {
 
       // Call the API
       const response: CreateExpenseResponse = await createExpenseTransaction();
-
-      console.log('API Response:', response);
-
+      
+      // API Response
+      
       // Show banner with API response for 3 seconds
       const bannerMessage = response.ReturnStatus === 'S'
         ? (response.ReportNumber
@@ -96,16 +96,14 @@ export const useCreateExpense = (): UseCreateExpenseReturn => {
         try {
           await AsyncStorageService.clearExpenseDraft();
         } catch (error) {
-          console.error('Error clearing expense draft:', error);
+          // Error clearing expense draft
         }
         setBanner({ visible: false, type: 'info', title: '' });
         navigate('Dashboard');
       }, 1000);
 
     } catch (error) {
-      console.error('Error creating expense:', error);
-
-      // Handle different types of errors
+      // Error creating expense
       let errorMessage = 'Failed to create expense. Please try again.';
 
       if (error instanceof Error) {
@@ -131,7 +129,7 @@ export const useCreateExpense = (): UseCreateExpenseReturn => {
         try {
           await AsyncStorageService.clearExpenseDraft();
         } catch (error) {
-          console.error('Error clearing expense draft:', error);
+          // Error clearing expense draft
         }
         setBanner({ visible: false, type: 'info', title: '' });
         navigate('Dashboard');

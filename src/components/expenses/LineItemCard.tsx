@@ -72,19 +72,29 @@ export const LineItemCard: React.FC<LineItemCardProps> = ({
           )}
         </View>
         
-        <View style={styles.actions}>
-                     <TouchableOpacity
-             style={[styles.actionButton, { backgroundColor: '#000000' }]}
-             onPress={() => onEdit(lineItem)}
-           >
-             <Feather name="edit-2" size={14} color={colors.white} />
-           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: colors.error }]}
-            onPress={() => onDelete(lineItem.id)}
-          >
-            <Feather name="trash-2" size={14} color={colors.white} />
-          </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {/* Itemization Indicator */}
+          {lineItem.itemize && (
+            <View style={[styles.itemizedTag, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+              <Feather name="layers" size={12} color={colors.primary} />
+              <Text style={[styles.itemizedText, { color: colors.primary }]}>Itemized</Text>
+            </View>
+          )}
+          
+          <View style={styles.actions}>
+                       <TouchableOpacity
+               style={[styles.actionButton, { backgroundColor: '#000000' }]}
+               onPress={() => onEdit(lineItem)}
+             >
+               <Feather name="edit-2" size={14} color={colors.white} />
+             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, { backgroundColor: colors.error }]}
+              onPress={() => onDelete(lineItem.id)}
+            >
+              <Feather name="trash-2" size={14} color={colors.white} />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -173,6 +183,24 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.base,
+  },
+  itemizedTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  itemizedText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',

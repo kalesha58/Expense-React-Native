@@ -105,29 +105,22 @@ const generateMobileTransactionId = (): string => {
 
 // Get ExpenseReportID based on expense type
 const getExpenseReportId = (expenseType: string): string => {
-  // Try exact match first
-  if (EXPENSE_TYPE_MAPPING[expenseType]) {
-    return EXPENSE_TYPE_MAPPING[expenseType];
+  const expenseTypeMap: { [key: string]: string } = {
+    'TRAVEL': '1001',
+    'MEALS': '1002',
+    'ACCOMMODATION': '1003',
+    'TRANSPORTATION': '1004',
+    'OFFICE_SUPPLIES': '1005',
+    'CLIENT_ENTERTAINMENT': '1006',
+    'TRAINING': '1007',
+    'MISCELLANEOUS': '1008',
+  };
+
+  const expenseReportId = expenseTypeMap[expenseType];
+  if (!expenseReportId) {
+    // No ExpenseReportID found for expense type, using default
   }
-  
-  // Try case-insensitive match
-  const lowercaseType = expenseType.toLowerCase();
-  for (const [key, value] of Object.entries(EXPENSE_TYPE_MAPPING)) {
-    if (key.toLowerCase() === lowercaseType) {
-      return value;
-    }
-  }
-  
-  // Try partial match for similar expense types
-  for (const [key, value] of Object.entries(EXPENSE_TYPE_MAPPING)) {
-    if (key.toLowerCase().includes(lowercaseType) || lowercaseType.includes(key.toLowerCase())) {
-      return value;
-    }
-  }
-  
-  // Return default if no match found
-  console.warn(`No ExpenseReportID found for expense type: ${expenseType}, using default`);
-  return EXPENSE_TYPE_MAPPING['default'];
+  return expenseReportId || '1008'; // Default to MISCELLANEOUS
 };
 
 // Get the most appropriate ExpenseReportID for multiple line items
@@ -147,7 +140,6 @@ const getBestExpenseReportId = (lineItems: LineItem[]): string => {
   for (const priority of priorityOrder) {
     for (const item of lineItems) {
       if (item.expenseType && getExpenseReportId(item.expenseType) === EXPENSE_TYPE_MAPPING[priority]) {
-        console.log(`Selected ExpenseReportID based on priority expense type: ${priority}`);
         return EXPENSE_TYPE_MAPPING[priority];
       }
     }
@@ -201,8 +193,6 @@ const buildCreateExpensePayload = async (): Promise<CreateExpensePayload> => {
     // All line items in a single expense report should use the same ExpenseReportID
     const expenseReportId = getBestExpenseReportId(lineItems);
 
-    console.log(`Using ExpenseReportID: ${expenseReportId} for expense report with ${lineItems.length} line items`);
-
     // Build the expense header
     const expenseHeader: ExpenseHeader = {
       MobileTransactionId: generateMobileTransactionId(),
@@ -235,7 +225,6 @@ const buildCreateExpensePayload = async (): Promise<CreateExpensePayload> => {
 
     return payload;
   } catch (error) {
-    console.error('Error building payload:', error);
     throw error;
   }
 };
@@ -261,8 +250,6 @@ export const createExpenseTransaction = async (): Promise<CreateExpenseResponse>
     // Build the payload
     const payload = await buildCreateExpensePayload();
 
-    console.log('Creating expense with payload:', JSON.stringify(payload, null, 2));
-
     // Make the API call
     const response = await fetch(CREATE_EXPENSE_ENDPOINT, {
       method: 'POST',
@@ -276,7 +263,6 @@ export const createExpenseTransaction = async (): Promise<CreateExpenseResponse>
     }
 
     const responseData: WrappedApiResponse | CreateExpenseResponse[] | CreateExpenseResponse = await response.json();
-    console.log('Create expense response:', responseData);
 
     // Handle the wrapped response structure
     let apiResponse: CreateExpenseResponse;
@@ -297,7 +283,6 @@ export const createExpenseTransaction = async (): Promise<CreateExpenseResponse>
 
     return apiResponse;
   } catch (error) {
-    console.error('Error creating expense:', error);
     throw error;
   }
 };
@@ -343,7 +328,6 @@ export const validateExpenseData = async (): Promise<{ isValid: boolean; errors:
       errors,
     };
   } catch (error) {
-    console.error('Error validating expense data:', error);
     errors.push('Failed to validate expense data');
     return {
       isValid: false,

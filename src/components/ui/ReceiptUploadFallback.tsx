@@ -51,7 +51,7 @@ export const ReceiptUploadFallback: React.FC<ReceiptUploadFallbackProps> = ({
   
   // Debug isExtracting state changes
   React.useEffect(() => {
-    console.log('isExtracting state changed to (fallback):', isExtracting);
+    // isExtracting state changed to (fallback):
   }, [isExtracting]);
 
   // Image picker configuration
@@ -65,7 +65,7 @@ export const ReceiptUploadFallback: React.FC<ReceiptUploadFallbackProps> = ({
 
   // Handle image picker response
   const handleImagePickerResponse = useCallback((response: ImagePickerResponse) => {
-    console.log('Image picker response (fallback):', response);
+    // Image picker response (fallback):
     
     if (response.didCancel || response.errorMessage) {
       if (response.errorMessage) {
@@ -81,17 +81,17 @@ export const ReceiptUploadFallback: React.FC<ReceiptUploadFallbackProps> = ({
         mimeType: asset.type || 'image/jpeg',
       })).filter(file => file.uri !== '');
 
-      console.log('New files to add (fallback):', newFiles);
+      // New files to add (fallback):
 
       if (newFiles.length > 0) {
         onChange([...value, ...newFiles]);
         
         // Automatically extract from the first image if extraction callback is provided
         if (onExtractionComplete && newFiles.length > 0) {
-          console.log('Starting receipt extraction for (fallback):', newFiles[0].uri);
+          // Starting receipt extraction for (fallback):
           extractReceiptDetails(newFiles[0].uri);
         } else {
-          console.log('No extraction callback provided or no files to extract (fallback)');
+          // No extraction callback provided or no files to extract (fallback)
         }
       }
     }
@@ -117,9 +117,8 @@ export const ReceiptUploadFallback: React.FC<ReceiptUploadFallbackProps> = ({
   // Extract receipt details from image
   const extractReceiptDetails = useCallback(async (fileUri: string) => {
     try {
-      console.log('Starting extraction process for (fallback):', fileUri);
       setIsExtracting(true);
-      console.log('isExtracting set to true (fallback)');
+      // Starting extraction process for (fallback):
       
       // Show initial alert to user
       Alert.alert(
@@ -130,36 +129,36 @@ export const ReceiptUploadFallback: React.FC<ReceiptUploadFallbackProps> = ({
       
       // Validate file format
       if (!isSupportedImageFormat(fileUri)) {
-        console.log('Unsupported file format (fallback):', fileUri);
+        // Unsupported file format (fallback):
         Alert.alert('Unsupported Format', 'Please select a supported image format (JPG, PNG, GIF, WebP)');
         return;
       }
       
-      console.log('File format validation passed (fallback)');
+      // File format validation passed (fallback)
       
       // Check file size
       const isAcceptableSize = await isFileSizeAcceptable(fileUri);
       if (!isAcceptableSize) {
-        console.log('File size too large (fallback)');
+        // File size too large (fallback)
         Alert.alert('File Too Large', 'Please select an image smaller than 10MB');
         return;
       }
       
-      console.log('File size validation passed (fallback)');
+      // File size validation passed (fallback)
       
       // Convert to base64
-      console.log('Converting image to base64 (fallback)...');
+      // Converting image to base64 (fallback)...
       const base64Result = await convertImageToBase64(fileUri);
-      console.log('Base64 conversion completed (fallback), length:', base64Result.base64.length);
+      // Base64 conversion completed (fallback), length:
       
       // Call extraction API
-      console.log('Calling receipt extraction API (fallback)...');
+      // Calling receipt extraction API (fallback)...
       const extractionResult = await receiptExtractionAPI.extractReceiptDetails(base64Result.base64);
-      console.log('Extraction API response (fallback):', extractionResult);
+      // Extraction API response (fallback):
       
       // Call the callback with extraction results
       if (onExtractionComplete) {
-        console.log('Calling onExtractionComplete callback (fallback)');
+        // Calling onExtractionComplete callback (fallback)
         onExtractionComplete(extractionResult);
       }
       
@@ -169,13 +168,13 @@ export const ReceiptUploadFallback: React.FC<ReceiptUploadFallbackProps> = ({
       );
       
     } catch (error) {
-      console.error('Receipt extraction error (fallback):', error);
+      // Receipt extraction error (fallback):
       Alert.alert(
         'Extraction Failed', 
         error instanceof Error ? error.message : 'Failed to extract receipt details. Please try again.'
       );
     } finally {
-      console.log('Setting isExtracting to false (fallback)');
+      // Setting isExtracting to false (fallback)
       setIsExtracting(false);
     }
   }, [onExtractionComplete]);

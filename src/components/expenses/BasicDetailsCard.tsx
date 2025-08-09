@@ -50,7 +50,7 @@ export const BasicDetailsCard: React.FC<BasicDetailsCardProps> = ({
         label="Expense Title"
         value={title}
         onChangeText={onTitleChange}
-        placeholder="Enter Business Purpose"
+        placeholder="Enter Expense Report Title"
         containerStyle={styles.inputContainer}
       />
       

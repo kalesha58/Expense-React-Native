@@ -58,10 +58,9 @@ export const useExpense = (): UseExpenseReturn => {
     setIsLoading(true);
     try {
       // TODO: Implement API call to submit expense report
-      console.log('Submitting expense report:', { header, lineItems });
       await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
     } catch (error) {
-      console.error('Failed to submit expense report:', error);
+      // Failed to submit expense report
       throw error;
     } finally {
       setIsLoading(false);

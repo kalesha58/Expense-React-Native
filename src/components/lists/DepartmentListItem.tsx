@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { SIZES } from '../../constants/theme';
 import { Department } from '../../hooks/useDepartments';
+import Feather from 'react-native-vector-icons/Feather';
 
 interface DepartmentListItemProps {
   department: Department;
@@ -15,16 +16,14 @@ export const DepartmentListItem: React.FC<DepartmentListItemProps> = ({
   onPress,
   isSelected = false,
 }) => {
-  const { colors, shadows } = useTheme();
+  const { colors } = useTheme();
 
   return (
     <TouchableOpacity
       style={[
         styles.container,
         { 
-          backgroundColor: isSelected ? colors.primary + '10' : colors.card,
-          borderLeftColor: isSelected ? colors.primary : 'transparent',
-          ...shadows.small,
+          backgroundColor: isSelected ? colors.primary + '08' : colors.background,
         },
       ]}
       onPress={onPress}
@@ -44,20 +43,24 @@ export const DepartmentListItem: React.FC<DepartmentListItemProps> = ({
           <Text style={[
             styles.code, 
             { 
-              color: isSelected ? colors.primary + '80' : colors.placeholder 
+              color: isSelected ? colors.primary + '80' : colors.placeholder
             }
           ]}>
-            Code: {department.departmentCode}
+            {department.departmentCode}
           </Text>
         </View>
         
         <View style={styles.rightSection}>
           {isSelected ? (
             <View style={[styles.selectedIndicator, { backgroundColor: colors.primary }]}>
-              <Text style={styles.checkmark}>✓</Text>
+              <Feather name="check" size={14} color="#fff" />
             </View>
           ) : (
-            <Text style={[styles.arrow, { color: colors.placeholder }]}>›</Text>
+            <Feather 
+              name="chevron-right" 
+              size={18} 
+              color={colors.placeholder} 
+            />
           )}
         </View>
       </View>
@@ -67,26 +70,24 @@ export const DepartmentListItem: React.FC<DepartmentListItemProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderLeftWidth: 3,
-    marginHorizontal: 0,
-    marginVertical: 6,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    marginHorizontal: 16,
+    marginVertical: 1,
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
   },
   textContainer: {
     flex: 1,
   },
   title: {
     fontSize: SIZES.medium,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   code: {
     fontSize: SIZES.small,
@@ -102,14 +103,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  checkmark: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  arrow: {
-    fontSize: 20,
-    fontWeight: 'bold',
   },
 }); 

@@ -63,10 +63,8 @@ const useApiSequence = () => {
       // Initialize database first
       try {
         await databaseManager.initialize();
-        console.log('Database initialized successfully');
       } catch (dbInitError) {
-        console.error('Failed to initialize database:', dbInitError);
-        throw new Error('Database initialization failed');
+        // Failed to initialize database
       }
 
       // Call the appropriate API based on the name
@@ -91,7 +89,7 @@ const useApiSequence = () => {
       }
 
       // Log the raw response for debugging (simplified)
-      console.log(`API response received: ${apiName}`);
+      // console.log(`API response received: ${apiName}`);
 
       // Process the response
       if (response && (response.data || response.Response)) {
@@ -107,7 +105,7 @@ const useApiSequence = () => {
               // Check if table exists, if not create one using metadata
               const tableExists = await databaseManager.tableExists(apiConfig.tableName);
               if (!tableExists) {
-                console.log(`Creating table ${apiConfig.tableName} using metadata...`);
+                // console.log(`Creating table ${apiConfig.tableName} using metadata...`);
                 
                 // Try to get metadata first, fallback to data-based schema
                 let columns: any[] = [];
@@ -142,12 +140,12 @@ const useApiSequence = () => {
                       type: 'TEXT' as const, // Default to TEXT for simplicity
                       constraints: []
                     }));
-                    console.log(`Metadata-based schema created for ${apiConfig.tableName}`);
+                    // console.log(`Metadata-based schema created for ${apiConfig.tableName}`);
                   } else {
                     throw new Error('Invalid metadata response');
                   }
                 } catch (metadataError) {
-                  console.log(`Metadata fetch failed for ${apiName}, using data-based schema:`, metadataError);
+                  // console.log(`Metadata fetch failed for ${apiName}, using data-based schema:`, metadataError);
                   // Fallback to data-based schema
                   const firstItem = data[0];
                   columns = Object.keys(firstItem).map(key => ({
@@ -161,18 +159,18 @@ const useApiSequence = () => {
                   name: apiConfig.tableName,
                   columns
                 });
-                console.log(`Table ${apiConfig.tableName} created successfully`);
+                // console.log(`Table ${apiConfig.tableName} created successfully`);
               }
               
               // Insert data into database
               const insertedCount = await databaseManager.insertData(apiConfig.tableName, data);
               
               // Simplified console log for data insertion
-              console.log(`Data inserted: ${apiConfig.tableName} - ${insertedCount} records`);
-              console.log('Data:', data);
+              // console.log(`Data inserted: ${apiConfig.tableName} - ${insertedCount} records`);
+              // console.log('Data:', data);
             }
           } catch (dbError) {
-            console.error(`Failed to insert data into ${apiName} table:`, dbError);
+            // console.error(`Failed to insert data into ${apiName} table:`, dbError);
           }
         }
         
@@ -186,7 +184,7 @@ const useApiSequence = () => {
             }
           }
         }));
-        console.log(`API call completed: ${apiName} - ${dataCount} records`);
+        // console.log(`API call completed: ${apiName} - ${dataCount} records`);
       } else {
         logger.warn('Invalid response format', { apiName, response });
         throw new Error('Invalid response format - no data found');
@@ -247,7 +245,7 @@ const useApiSequence = () => {
     // Mark as complete
     setIsComplete(true);
     isRunningRef.current = false;
-    console.log('All API sequences completed');
+    // console.log('All API sequences completed');
   };
 
   return {
@@ -266,7 +264,7 @@ export default function ActivityScreen() {
   
   // Log when ActivityScreen is mounted
   React.useEffect(() => {
-    console.log('ActivityScreen mounted');
+    // console.log('ActivityScreen mounted');
   }, []);
   
   // Animation values

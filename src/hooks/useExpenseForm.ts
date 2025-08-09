@@ -1,9 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AsyncStorageService, type LineItem, type ExpenseHeader } from '../services/asyncStorage';
 import { push, navigate } from '../utils/NavigationUtils';
 import { createExpenseTransaction, validateExpenseData, type CreateExpenseResponse } from '../services/expenseTransactionService';
+import { PayloadBuilder } from '../services/payloadBuilder';
 
 // Banner state interface
 interface BannerState {
@@ -32,6 +34,13 @@ interface ExpenseFormData {
   title: string;
   department: string;
   lineItems: LineItemData[];
+  // New header fields
+  currency: string;
+  purpose: string;
+  employeeId: string;
+  orgId: string;
+  userId: string;
+  respId: string;
 }
 
 export const useExpenseForm = () => {
@@ -41,6 +50,13 @@ export const useExpenseForm = () => {
     title: '',
     department: '',
     lineItems: [],
+    // Initialize new header fields
+    currency: 'USD',
+    purpose: '',
+    employeeId: '',
+    orgId: '',
+    userId: '',
+    respId: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,17 +72,42 @@ export const useExpenseForm = () => {
     loadExistingData();
   }, []);
 
-  const loadExistingData = async () => {
+  const loadExistingData = useCallback(async () => {
     try {
       setIsLoading(true);
       const savedHeader = await AsyncStorageService.getHeader();
       const savedLineItems = await AsyncStorageService.getLineItems();
       
+      // Load selected department from login process if no saved header exists
+      let defaultDepartment = '';
+      if (!savedHeader || !savedHeader.department) {
+        try {
+          const selectedDepartment = await AsyncStorage.getItem('selectedDepartment');
+          if (selectedDepartment) {
+            defaultDepartment = selectedDepartment;
+          }
+        } catch (error) {
+          // Error loading selected department, use empty string
+        }
+      }
+      
       if (savedHeader) {
         setFormData(prev => ({
           ...prev,
           title: savedHeader.title,
-          department: savedHeader.department,
+          department: savedHeader.department || defaultDepartment,
+          currency: savedHeader.currency || 'USD',
+          purpose: savedHeader.purpose || '',
+          employeeId: savedHeader.employeeId || '',
+          orgId: savedHeader.orgId?.toString() || '',
+          userId: savedHeader.userId || '',
+          respId: savedHeader.respId || '',
+        }));
+      } else if (defaultDepartment) {
+        // No saved header, but we have a default department from login
+        setFormData(prev => ({
+          ...prev,
+          department: defaultDepartment,
         }));
       }
       
@@ -89,11 +130,11 @@ export const useExpenseForm = () => {
         lineItems: convertedLineItems,
       }));
     } catch (error) {
-      console.error('Error loading existing data:', error);
+      // Error loading existing data
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Add a focus listener to reload data when returning from LineItemEntryScreen
   useEffect(() => {
@@ -127,8 +168,7 @@ export const useExpenseForm = () => {
                    // Navigate to dashboard after clearing data
                    navigate('Dashboard');
                  } catch (error) {
-                   console.error('Error clearing draft:', error);
-                   // Still navigate to dashboard even if clearing fails
+                   // Error clearing draft
                    navigate('Dashboard');
                  }
                },
@@ -163,14 +203,16 @@ export const useExpenseForm = () => {
     setFormData(updatedData);
     
     // Save header changes to AsyncStorage
-    if (field === 'title' || field === 'department') {
+    if (['title', 'department', 'currency', 'purpose', 'employeeId', 'orgId', 'userId', 'respId'].includes(field)) {
       try {
-        await AsyncStorageService.updateHeader({
-          title: field === 'title' ? value : formData.title,
-          department: field === 'department' ? value : formData.department,
-        });
+        const headerData = {
+          ...formData,
+          [field]: value,
+          orgId: field === 'orgId' ? parseInt(value) || 0 : (formData.orgId ? parseInt(formData.orgId) || 0 : 0),
+        };
+        await AsyncStorageService.updateHeader(headerData);
       } catch (error) {
-        console.error('Error saving header:', error);
+        // Error saving header
       }
     }
   }, [formData]);
@@ -197,12 +239,12 @@ export const useExpenseForm = () => {
           // Reload data to show the new line item
           await loadExistingData();
         } catch (error) {
-          console.error('Error saving line item:', error);
+          // Error saving line item
           Alert.alert('Error', 'Failed to save line item');
         }
       },
     });
-  }, []);
+  }, [loadExistingData]);
 
   const handleEditLineItem = useCallback((lineItem: LineItemData) => {
     push('LineItemEntry', {
@@ -226,28 +268,24 @@ export const useExpenseForm = () => {
           // Reload data to show the updated line item
           await loadExistingData();
         } catch (error) {
-          console.error('Error updating line item:', error);
+          // Error updating line item
           Alert.alert('Error', 'Failed to update line item');
         }
       },
       editMode: true,
       lineItem: lineItem,
     });
-  }, []);
+  }, [loadExistingData]);
 
   const handleDeleteLineItem = useCallback(async (lineItemId: string) => {
-    console.log('Attempting to delete line item:', lineItemId);
-    
     try {
       // Delete the line item from AsyncStorage
       await AsyncStorageService.deleteLineItem(lineItemId);
-      console.log('Successfully deleted line item from AsyncStorage');
       
       // Reload data to reflect the deletion
       await loadExistingData();
-      console.log('Successfully reloaded data after deletion');
     } catch (error) {
-      console.error('Error deleting line item:', error);
+      // Error deleting line item
       Alert.alert('Error', 'Failed to delete line item. Please try again.');
     }
   }, [loadExistingData]);
@@ -287,8 +325,42 @@ export const useExpenseForm = () => {
     });
     
     try {
-      // Validate data before submission
-      const validation = await validateExpenseData();
+      // Convert form data to line items
+      const lineItems: LineItem[] = formData.lineItems.map(item => ({
+        id: item.id,
+        receipt: item.receiptFiles.length > 0 ? item.receiptFiles[0].uri : undefined,
+        amount: parseFloat(item.amount),
+        currency: item.currency,
+        expenseType: item.expenseType,
+        date: item.date.toISOString(),
+        location: item.location,
+        supplier: item.supplier,
+        comment: item.comment,
+        itemized: item.itemize ? [] : undefined,
+        // Map new fields for payload
+        itemDescription: item.expenseType,
+        startDate: item.date.toISOString().split('T')[0],
+        numberOfDays: '1',
+        justification: item.comment,
+        toLocation: '',
+        merchantName: item.supplier,
+        dailyRates: null,
+      }));
+
+      const headerData: ExpenseHeader = {
+        title: formData.title,
+        department: formData.department,
+        currency: formData.currency,
+        purpose: formData.purpose,
+        employeeId: formData.employeeId,
+        orgId: formData.orgId ? parseInt(formData.orgId) : undefined,
+        userId: formData.userId,
+        respId: formData.respId,
+        departmentCode: formData.department.split(' - ')[0] || formData.department,
+      };
+
+      // Validate using the new payload builder
+      const validation = PayloadBuilder.validatePayload(headerData, lineItems);
       
       if (!validation.isValid) {
         setBanner({
@@ -296,27 +368,25 @@ export const useExpenseForm = () => {
           type: 'error',
           title: 'Validation Error',
           message: `Please fix the following issues:\n\n${validation.errors.join('\n')}`,
-          // No action buttons - auto navigate after 3 seconds
+          onAction: () => setBanner({ visible: false, type: 'info', title: '' }),
+          actionText: 'OK',
         });
-        
-               // Clear AsyncStorage and navigate to dashboard after 3 seconds
-       setTimeout(async () => {
-         try {
-           await AsyncStorageService.clearExpenseDraft();
-         } catch (error) {
-           console.error('Error clearing expense draft:', error);
-         }
-         setBanner({ visible: false, type: 'info', title: '' });
-         navigate('Dashboard');
-       }, 3000);
-       
-       return;
+        return;
       }
 
-      // Call the API to create expense
+      // Build the API payload
+      const payload = PayloadBuilder.buildCreateExpensePayload(headerData, lineItems, {
+        employeeId: formData.employeeId,
+        orgId: formData.orgId ? parseInt(formData.orgId) : undefined,
+        userId: formData.userId,
+        respId: formData.respId,
+      });
+
+      // Log the payload for debugging
+      console.log('Create Expense Payload:', JSON.stringify(payload, null, 2));
+
+      // Call the API to create expense (using existing service for now)
       const response: CreateExpenseResponse = await createExpenseTransaction();
-      
-      console.log('API Response:', response);
       
       // Show banner with API response for 3 seconds
       const bannerMessage = response.ReturnStatus === 'S' 
@@ -338,13 +408,13 @@ export const useExpenseForm = () => {
          try {
            await AsyncStorageService.clearExpenseDraft();
          } catch (error) {
-           console.error('Error clearing expense draft:', error);
+           // Error clearing expense draft
          }
          setBanner({ visible: false, type: 'info', title: '' });
          navigate('Dashboard');
        }, 3000);
     } catch (error) {
-      console.error('Failed to create expense:', error);
+      // Error creating expense
       
       // Handle different types of errors
       let errorMessage = 'Failed to create expense. Please try again.';
@@ -372,7 +442,7 @@ export const useExpenseForm = () => {
          try {
            await AsyncStorageService.clearExpenseDraft();
          } catch (error) {
-           console.error('Error clearing expense draft:', error);
+           // Error clearing expense draft
          }
          setBanner({ visible: false, type: 'info', title: '' });
          navigate('Dashboard');

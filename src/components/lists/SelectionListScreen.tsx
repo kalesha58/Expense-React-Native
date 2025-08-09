@@ -155,7 +155,7 @@ export const SelectionListScreen: React.FC<SelectionListScreenProps> = ({
         style={[
           styles.itemContainer,
           { 
-            backgroundColor: isSelected ? colors.primary + '10' : colors.card,
+            backgroundColor: isSelected ? colors.primary + '08' : colors.card,
             borderLeftColor: isSelected ? colors.primary : 'transparent',
           },
         ]}

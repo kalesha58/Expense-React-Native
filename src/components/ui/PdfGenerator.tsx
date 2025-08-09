@@ -259,7 +259,6 @@ export const PdfGenerator: React.FC<PdfGeneratorProps> = ({ expense, onDownload 
           { 
             text: 'View Content', 
             onPress: () => {
-              console.log('PDF Content:', pdfContent);
               if (onDownload) {
                 onDownload(pdfContent);
               }
@@ -268,7 +267,6 @@ export const PdfGenerator: React.FC<PdfGeneratorProps> = ({ expense, onDownload 
         ]
       );
     } catch (error) {
-      console.error('Error generating PDF:', error);
       Alert.alert('Error', 'Failed to generate PDF');
     }
   };

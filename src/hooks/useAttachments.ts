@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { attachmentAPI } from '../service/api';
 import { getActualFileType, shouldDisplayAsImage } from '../utils/fileTypeDetector';
 import { ExpenseDetail } from './useExpenseDetails';
@@ -16,10 +16,9 @@ export const useAttachments = (): UseAttachmentsReturn => {
   const [modalVisible, setModalVisible] = useState(false);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
 
-  const loadAttachmentsForItem = async (item: ExpenseDetail) => {
-    setLoadingAttachments(true);
-
+  const loadAttachmentsForItem = useCallback(async (item: ExpenseDetail) => {
     try {
+      setLoadingAttachments(true);
       const result = await attachmentAPI.getAttachments(item.LineId);
 
       if (result && result.AttachmentList && Array.isArray(result.AttachmentList)) {
@@ -58,12 +57,12 @@ export const useAttachments = (): UseAttachmentsReturn => {
         setSelectedItemAttachments([]);
       }
     } catch (error) {
-      console.error(`Failed to load attachments for LineId ${item.LineId}:`, error);
+      // Failed to load attachments for LineId
       setSelectedItemAttachments([]);
     } finally {
       setLoadingAttachments(false);
     }
-  };
+  }, []);
 
   const closeModal = () => {
     setModalVisible(false);

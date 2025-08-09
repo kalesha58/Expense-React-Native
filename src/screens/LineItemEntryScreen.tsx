@@ -19,26 +19,13 @@ import { Dropdown } from '../components/ui/Dropdown';
 import { TypeSelector } from '../components/ui/ExpenseTypeSelector';
 import { DatePicker } from '../components/ui/DatePicker';
 import { ReceiptUpload } from '../components/ui/ReceiptUpload';
-import { ReceiptUploadFallback } from '../components/ui/ReceiptUploadFallback';
-import { receiptExtractionAPI } from '../service/api';
 import { SIZES } from '../constants/theme';
-import { CURRENCIES, PROJECT_CODES } from '../constants/mockData';
+import { CURRENCIES } from '../constants/mockData';
 import useExpenseItems from '../hooks/useExpenseItems';
-
-// Fallback expense types if database is empty
-const FALLBACK_EXPENSE_TYPES = [
-  { label: "Travel", value: "TRAVEL" },
-  { label: "Meals", value: "MEALS" },
-  { label: "Accommodation", value: "ACCOMMODATION" },
-  { label: "Transportation", value: "TRANSPORTATION" },
-  { label: "Office Supplies", value: "OFFICE_SUPPLIES" },
-  { label: "Client Entertainment", value: "CLIENT_ENTERTAINMENT" },
-  { label: "Training", value: "TRAINING" },
-  { label: "Miscellaneous", value: "MISCELLANEOUS" },
-];
-import { insertExpense } from '../services/sqlite';
 import { navigate } from '../utils/NavigationUtils';
 import { AsyncStorageService, type LineItem } from '../services/asyncStorage';
+import { getExpenseTypeConfig, validateDynamicFields } from '../types/ExpenseTypes';
+import { logger } from '../utils/logger';
 
 type ReceiptFile = {
   uri: string;
@@ -133,8 +120,52 @@ export const LineItemEntryScreen: React.FC = () => {
   const [itemize, setItemize] = useState(false);
   const [receipts, setReceipts] = useState<ReceiptFile[]>([]);
   const [itemizedExpenses, setItemizedExpenses] = useState<ItemizedExpense[]>([]);
+  
+  // New required fields for payload
+  const [numberOfDays, setNumberOfDays] = useState('1');
+  const [toLocation, setToLocation] = useState('');
+  const [itemizedCount, setItemizedCount] = useState(0);
+  const [currentLineItemId, setCurrentLineItemId] = useState('');
+  const [dailyRates, setDailyRates] = useState('');
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Get dynamic field configuration based on expense type
+  const fieldConfig = React.useMemo(() => {
+    if (!expenseType) return { showToLocation: false, showDailyRates: false, showNumberOfDays: false, requiredFields: [] };
+    return getExpenseTypeConfig(expenseType);
+  }, [expenseType]);
+
+  // Generate or load line item ID and itemized count
+  useEffect(() => {
+    const initializeLineItem = async () => {
+      let lineItemId: string;
+      
+      if (existingLineItem?.id) {
+        // Editing existing line item
+        lineItemId = existingLineItem.id;
+        console.log('🔄 Using existing lineItemId:', lineItemId);
+        console.log('📝 Existing line item data:', existingLineItem);
+        setCurrentLineItemId(lineItemId);
+      } else {
+        // Creating new line item - generate unique ID
+        lineItemId = `line_item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        console.log('🆕 Generated new lineItemId:', lineItemId);
+        setCurrentLineItemId(lineItemId);
+      }
+
+      // Load itemized count for this line item
+      try {
+        const count = await AsyncStorageService.getItemizedCount(lineItemId);
+        console.log('📊 Loaded itemized count for lineItemId:', lineItemId, 'count:', count);
+        setItemizedCount(count);
+      } catch (error) {
+        console.error('Error loading itemized count:', error);
+      }
+    };
+    
+    initializeLineItem();
+  }, [existingLineItem]);
 
   // Handle receipt extraction results
   const handleReceiptExtraction = React.useCallback((extractionResult: ReceiptExtractionResult) => {
@@ -206,6 +237,21 @@ export const LineItemEntryScreen: React.FC = () => {
     if (!currency) newErrors.currency = 'Currency is required';
     if (!location.trim()) newErrors.location = 'Location is required';
 
+    // Dynamic field validation based on expense type
+    if (expenseType) {
+      const formData = {
+        toLocation,
+        dailyRates,
+        numberOfDays,
+      };
+      const dynamicErrors = validateDynamicFields(expenseType, formData);
+      dynamicErrors.forEach(error => {
+        if (error.includes('To Location')) newErrors.toLocation = error;
+        else if (error.includes('Daily Rate')) newErrors.dailyRates = error;
+        else if (error.includes('Number of Days')) newErrors.numberOfDays = error;
+      });
+    }
+
     // Validate itemized expenses if itemization is enabled
     if (itemize && itemizedExpenses.length > 0) {
       const totalItemizedAmount = itemizedExpenses.reduce((sum, item) => sum + item.amount, 0);
@@ -231,7 +277,7 @@ export const LineItemEntryScreen: React.FC = () => {
     if (!validateForm()) return;
 
     const lineItemData: LineItemData = {
-      id: existingLineItem?.id || Date.now().toString(),
+      id: currentLineItemId, // Use consistent ID
       date,
       expenseType,
       supplier,
@@ -269,7 +315,7 @@ export const LineItemEntryScreen: React.FC = () => {
     try {
       // Create the line item data
       const lineItemData: LineItemData = {
-        id: existingLineItem?.id || Date.now().toString(),
+        id: currentLineItemId, // Use consistent ID
         date,
         expenseType,
         supplier,
@@ -300,8 +346,10 @@ export const LineItemEntryScreen: React.FC = () => {
       }
 
       // Save to AsyncStorage
+      console.log('💾 Saving line item with ID:', currentLineItemId, 'isEditMode:', isEditMode);
+      
       const asyncStorageLineItem: LineItem = {
-        id: lineItemData.id,
+        id: currentLineItemId, // Ensure we use the consistent ID
         receipt: receipts.length > 0 ? receipts[0].uri : undefined,
         amount: parseFloat(amount),
         currency,
@@ -311,6 +359,15 @@ export const LineItemEntryScreen: React.FC = () => {
         supplier,
         comment: comments,
         itemized: itemize ? [] : undefined,
+        // New required fields
+        lineNum: undefined, // Will be set by the payload builder
+        itemDescription: expenseType,
+        startDate: date.toISOString().split('T')[0],
+        numberOfDays,
+        justification: comments,
+        toLocation,
+        merchantName: supplier,
+        dailyRates: dailyRates ? parseFloat(dailyRates) : undefined,
       };
 
       if (isEditMode) {
@@ -327,6 +384,42 @@ export const LineItemEntryScreen: React.FC = () => {
     }
   };
 
+  // Helper function to calculate form completion percentage
+  const getFormProgress = () => {
+    const requiredFields = ['expenseType', 'supplier', 'amount', 'currency', 'location'];
+    const conditionalFields = fieldConfig.requiredFields || [];
+    const allRequiredFields = [...requiredFields, ...conditionalFields];
+    
+    let filledFields = 0;
+    const formValues = {
+      expenseType,
+      supplier,
+      amount,
+      currency,
+      location,
+      toLocation,
+      dailyRates,
+      numberOfDays,
+    };
+    
+    allRequiredFields.forEach(field => {
+      if (formValues[field as keyof typeof formValues]) {
+        filledFields++;
+      }
+    });
+    
+    return Math.round((filledFields / allRequiredFields.length) * 100);
+  };
+
+  // Helper function to get progress text
+  const getProgressText = () => {
+    const progress = getFormProgress();
+    if (progress < 50) return "Fill in the basic details to get started";
+    if (progress < 80) return "Almost done! Complete the remaining fields";
+    if (progress < 100) return "Ready to save - just a few more details";
+    return "All required fields completed";
+  };
+
   const resetForm = () => {
     setDate(new Date());
     setExpenseType('');
@@ -339,11 +432,40 @@ export const LineItemEntryScreen: React.FC = () => {
     setReceipts([]);
     setItemizedExpenses([]);
     setErrors({});
+    // Reset new fields
+    setNumberOfDays('1');
+    setToLocation('');
+    setDailyRates('');
   };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <Header title={isEditMode ? "Edit Line Item" : "Add Expense Line Item"} showBackButton />
+      
+      {/* Form Progress Indicator */}
+      <View style={[styles.progressHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={styles.progressInfo}>
+          <Text style={[styles.progressTitle, { color: colors.text }]}>
+            {isEditMode ? "Update Line Item Details" : "Add New Line Item"}
+          </Text>
+          <Text style={[styles.progressSubtitle, { color: colors.placeholder }]}>
+            {getProgressText()}
+          </Text>
+        </View>
+        <View style={styles.progressIndicator}>
+          <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { backgroundColor: colors.primary, width: `${getFormProgress()}%` }
+              ]} 
+            />
+          </View>
+          <Text style={[styles.progressPercent, { color: colors.primary }]}>
+            {getFormProgress()}%
+          </Text>
+        </View>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -431,24 +553,94 @@ export const LineItemEntryScreen: React.FC = () => {
             containerStyle={styles.inputContainer}
           />
 
-          <View style={styles.itemizeContainer}>
-            <Text style={[styles.itemizeLabel, { color: colors.text }]}>
-              Itemize this expense?
-            </Text>
-            <TouchableOpacity
-              style={[styles.itemizeToggle, { backgroundColor: itemize ? colors.primary : colors.border }]}
-              onPress={() => setItemize(!itemize)}
-            >
-              <View style={[
-                styles.toggleCircle, 
-                { 
-                  backgroundColor: colors.background,
-                  transform: [{ translateX: itemize ? 20 : 0 }]
+          {/* Dynamic Fields Based on Expense Type */}
+          {(fieldConfig.showNumberOfDays || fieldConfig.showToLocation || fieldConfig.showDailyRates) && (
+            <View style={styles.dynamicFieldsSection}>
+              <Text style={[styles.dynamicSectionTitle, { color: colors.text }]}>
+                Additional Details for {expenseType}
+              </Text>
+              
+              {fieldConfig.showToLocation && (
+                <Input
+                  label={`To Location${fieldConfig.requiredFields.includes('toLocation') ? '*' : ''}`}
+                  placeholder="Destination location"
+                  value={toLocation}
+                  onChangeText={setToLocation}
+                  error={errors.toLocation}
+                  containerStyle={styles.inputContainer}
+                />
+              )}
+
+              <View style={styles.amountRow}>
+                {fieldConfig.showNumberOfDays && (
+                  <View style={{ flex: 1 }}>
+                    <Input
+                      label={`Number of Days${fieldConfig.requiredFields.includes('numberOfDays') ? '*' : ''}`}
+                      placeholder="1"
+                      value={numberOfDays}
+                      onChangeText={setNumberOfDays}
+                      keyboardType="numeric"
+                      error={errors.numberOfDays}
+                      containerStyle={styles.inputContainer}
+                    />
+                  </View>
+                )}
+                
+                {fieldConfig.showDailyRates && (
+                  <View style={{ flex: fieldConfig.showNumberOfDays ? 1 : 2 }}>
+                    <Input
+                      label={`Daily Rate${fieldConfig.requiredFields.includes('dailyRates') ? '*' : ''}`}
+                      placeholder="0.00"
+                      value={dailyRates}
+                      onChangeText={setDailyRates}
+                      keyboardType="numeric"
+                      error={errors.dailyRates}
+                      containerStyle={styles.inputContainer}
+                    />
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+
+          <TouchableOpacity 
+            style={styles.itemizeContainer}
+            onPress={() => {
+              const navigationParams = {
+                mainExpense: {
+                  name: expenseType || 'Expense Item',
+                  receiptAmount: parseFloat(amount) || 0,
+                  currency: currency
+                },
+                lineItemId: currentLineItemId,
+                onItemizedUpdate: (count: number) => setItemizedCount(count),
+                onAmountUpdate: (newAmount: number) => {
+                  console.log('💰 Updating line item amount from itemized screen:', newAmount);
+                  setAmount(newAmount.toString());
                 }
-              ]} />
-            </TouchableOpacity>
-          </View>
+              };
+              
+              (navigation as any).navigate('ItemizedBusinessExpenses', navigationParams);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.itemizeLabel, { color: colors.text }]}>
+              Itemize this expense
+            </Text>
+            <View style={styles.itemizeActions}>
+              {itemizedCount > 0 && (
+                <View style={[styles.countBadge, { backgroundColor: colors.button + '15' }]}>
+                  <Text style={[styles.countText, { color: colors.button }]}>
+                    {itemizedCount}
+                  </Text>
+                </View>
+              )}
+              <Feather name="chevron-right" size={20} color={colors.placeholder} />
+            </View>
+          </TouchableOpacity>
         </View>
+
+
 
         {/* Itemized Expenses Section */}
         {itemize && (
@@ -528,22 +720,22 @@ export const LineItemEntryScreen: React.FC = () => {
         )}
 
         <View style={styles.actionsContainer}>
-          {!isEditMode && (
-            <Button
-              title="Add Another"
-              onPress={handleAddLineItem}
-              variant="outline"
-              loading={isLoading}
-              style={styles.actionButton}
-            />
-          )}
+        {!isEditMode && (
           <Button
-            title={isEditMode ? "Update" : "Continue"}
-            onPress={handleContinueToReview}
+            title="Add Another"
+            onPress={handleAddLineItem}
+            variant="outline"
             loading={isLoading}
-            style={[styles.actionButton, isEditMode && styles.fullWidthButton]}
+              style={styles.actionButton}
           />
-        </View>
+        )}
+        <Button
+            title={isEditMode ? "Update" : "Continue"}
+          onPress={handleContinueToReview}
+          loading={isLoading}
+            style={[styles.actionButton, isEditMode && styles.fullWidthButton]}
+        />
+      </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -553,6 +745,45 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollView: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingVertical: 12 },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  progressInfo: {
+    flex: 1,
+  },
+  progressTitle: {
+    fontSize: SIZES.medium,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  progressSubtitle: {
+    fontSize: SIZES.small,
+    lineHeight: 18,
+  },
+  progressIndicator: {
+    alignItems: 'flex-end',
+    minWidth: 80,
+  },
+  progressBar: {
+    width: 60,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressPercent: {
+    fontSize: SIZES.small,
+    fontWeight: '600',
+  },
   headerSection: { marginBottom: 20 },
   sectionTitle: { fontSize: SIZES.xxlarge, fontWeight: '700', marginBottom: 8 },
   sectionSubtitle: { fontSize: SIZES.medium, lineHeight: 20 },
@@ -564,6 +795,34 @@ const styles = StyleSheet.create({
   },
   inputContainer: { marginBottom: 20 },
   amountRow: { flexDirection: 'row', gap: 12 },
+  dynamicFieldsSection: {
+    marginBottom: 20,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  dynamicSectionTitle: {
+    fontSize: SIZES.medium,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  itemizeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  countBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countText: {
+    fontSize: SIZES.small,
+    fontWeight: '600',
+  },
   actionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

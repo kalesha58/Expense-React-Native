@@ -113,7 +113,7 @@ export const ExpenseItemCard: React.FC<ExpenseItemCardProps> = ({
       <TouchableOpacity
         style={[
           styles.viewAttachmentsStrip,
-          { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }
+          { backgroundColor: colors.primary + '08', borderColor: colors.primary + '15' }
         ]}
         onPress={() => onViewAttachments(item)}
         disabled={isLoadingAttachments}

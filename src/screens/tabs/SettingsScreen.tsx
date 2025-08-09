@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -16,9 +16,20 @@ import { Header } from '../../components/layout/Header';
 import Feather from 'react-native-vector-icons/Feather';
 import { replace, navigate } from '../../utils/NavigationUtils';
 
+// Language options
+const LANGUAGE_OPTIONS = [
+  { label: 'English', value: 'en' },
+  { label: 'Spanish', value: 'es' },
+  { label: 'French', value: 'fr' },
+];
+
 export const SettingsScreen: React.FC = () => {
   const { logout, user } = useAuth();
   const { colors, isDark, setTheme, theme } = useTheme();
+  
+  // User preferences state
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
   
   const handleLogout = async () => {
     Alert.alert(
@@ -43,6 +54,20 @@ export const SettingsScreen: React.FC = () => {
   
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
+  };
+  
+  const handleChangePassword = () => {
+    Alert.alert('Change Password', 'Password change functionality coming soon!');
+  };
+  
+  const getLanguageLabel = (value: string) => {
+    const language = LANGUAGE_OPTIONS.find(lang => lang.value === value);
+    return language ? language.label : 'English';
+  };
+  
+  const handleLanguageSelect = (value: string) => {
+    setSelectedLanguage(value);
+    setLanguageDropdownOpen(false);
   };
   
   const renderSettingItem = (
@@ -94,11 +119,9 @@ export const SettingsScreen: React.FC = () => {
           )}
           
           {renderSettingItem(
-            <Feather name="settings" size={22} color={colors.primary} />,
-            'Account Settings',
-            () => {
-              navigate('Account');
-            }
+            <Feather name="lock" size={22} color={colors.primary} />,
+            'Change Password',
+            handleChangePassword
           )}
           
           {renderSettingItem(
@@ -125,11 +148,75 @@ export const SettingsScreen: React.FC = () => {
             />
           )}
           
+          {/* Language Selection */}
+          <View style={styles.languageSettingContainer}>
+            {renderSettingItem(
+              <Feather name="globe" size={22} color={colors.primary} />,
+              'Language',
+              () => setLanguageDropdownOpen(!languageDropdownOpen),
+              <View style={styles.languageValueContainer}>
+                <Text style={[styles.languageValueText, { color: colors.placeholder }]}>
+                  {getLanguageLabel(selectedLanguage)}
+                </Text>
+                <Feather 
+                  name={languageDropdownOpen ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color={colors.placeholder} 
+                />
+              </View>
+            )}
+            
+            {languageDropdownOpen && (
+              <View style={[styles.languageDropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {LANGUAGE_OPTIONS.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.languageOption,
+                      { 
+                        borderBottomColor: colors.border,
+                        backgroundColor: option.value === selectedLanguage ? colors.primary + '10' : 'transparent'
+                      }
+                    ]}
+                    onPress={() => handleLanguageSelect(option.value)}
+                  >
+                    <Text style={[
+                      styles.languageOptionText,
+                      { 
+                        color: option.value === selectedLanguage ? colors.primary : colors.text,
+                        fontWeight: option.value === selectedLanguage ? '600' : '400'
+                      }
+                    ]}>
+                      {option.label}
+                    </Text>
+                    {option.value === selectedLanguage && (
+                      <Feather name="check" size={16} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+          
           {renderSettingItem(
             <Feather name="bell" size={22} color={colors.primary} />,
             'Notifications',
             () => {
               Alert.alert('Notifications', 'Notification settings coming soon!');
+            }
+          )}
+        </View>
+        
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>
+            Reports & Analytics
+          </Text>
+          
+          {renderSettingItem(
+            <Feather name="bar-chart-2" size={22} color={colors.primary} />,
+            'Statistics',
+            () => {
+              navigate('Statistics');
             }
           )}
         </View>
@@ -201,6 +288,44 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   settingItemText: {
+    fontSize: SIZES.font,
+  },
+  languageSettingContainer: {
+    position: 'relative',
+  },
+  languageValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  languageValueText: {
+    fontSize: SIZES.font,
+    fontWeight: '500',
+  },
+  languageDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    borderWidth: 1,
+    borderRadius: SIZES.radius,
+    marginTop: 4,
+    zIndex: 1000,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  languageOptionText: {
     fontSize: SIZES.font,
   },
   versionContainer: {

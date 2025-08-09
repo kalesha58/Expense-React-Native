@@ -9,9 +9,10 @@ import useDepartments, { Department } from '../hooks/useDepartments';
 import Feather from 'react-native-vector-icons/Feather';
 import { replace } from '../utils/NavigationUtils';
 import { logger } from '../utils/logger';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DepartmentScreen = () => {
-    const { colors, shadows } = useTheme();
+    const { colors } = useTheme();
     const { departments, loading, error } = useDepartments();
     const [search, setSearch] = useState('');
     const [selected, setSelected] = useState<Department | null>(null);
@@ -30,18 +31,17 @@ const DepartmentScreen = () => {
         loading,
         error 
       });
-      
-      // Add more detailed logging
-      console.log('DepartmentScreen - departments:', departments);
-      console.log('DepartmentScreen - loading:', loading);
-      console.log('DepartmentScreen - error:', error);
-      console.log('DepartmentScreen - filteredDepartments:', filteredDepartments);
     }, [departments, loading, error, filteredDepartments]);
   
     const handleContinue = async () => {
       if (selected) {
         try {
           logger.info('Navigating to Activity screen', { selectedDepartment: selected.departmentName });
+          
+          // Store selected department for use in CreateExpenseScreen
+          const departmentString = `${selected.departmentCode} - ${selected.departmentName}`;
+          await AsyncStorage.setItem('selectedDepartment', departmentString);
+          logger.info('Stored selected department', { department: departmentString });
          
           await replace('Activity');
         } catch (error) {
@@ -55,8 +55,8 @@ const DepartmentScreen = () => {
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Header title="Select Department" showBackButton showThemeToggle />
           
-          {/* Search Section with Card Styling */}
-          <View style={[styles.searchSection, { backgroundColor: colors.card, ...shadows.small }]}>
+          {/* Search Section */}
+          <View style={styles.searchSection}>
             <SearchBar
               value={search}
               onChangeText={setSearch}
@@ -106,14 +106,13 @@ const DepartmentScreen = () => {
             )}
           </View>
 
-          {/* Footer with Card Styling */}
-          <View style={[styles.footer, { backgroundColor: colors.card, ...shadows.medium }]}> 
+          {/* Footer */}
+          <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}> 
             <TouchableOpacity
               style={[
                 styles.continueBtn, 
                 { 
                   backgroundColor: selected ? colors.button : colors.disabled,
-                  ...shadows.small
                 }
               ]}
               disabled={!selected}
@@ -138,8 +137,6 @@ const DepartmentScreen = () => {
       marginHorizontal: 16,
       marginTop: 12,
       marginBottom: 8,
-      borderRadius: 12,
-      padding: 4,
     },
     searchBar: {
       marginHorizontal: 0,
@@ -148,14 +145,12 @@ const DepartmentScreen = () => {
     },
     contentArea: {
       flex: 1,
-      marginHorizontal: 16,
     },
     listContainer: {
       flex: 1,
-      marginTop: 8,
     },
     listContent: {
-      paddingVertical: 8,
+      paddingTop: 8,
       paddingBottom: 100,
     },
     footer: {
@@ -165,7 +160,6 @@ const DepartmentScreen = () => {
       bottom: 0,
       padding: 16,
       borderTopWidth: 1,
-      borderTopColor: '#E5E7EB',
     },
     continueBtn: {
       width: '100%',
@@ -205,34 +199,6 @@ const DepartmentScreen = () => {
       marginTop: 16,
       fontSize: 16,
       fontWeight: '500',
-    },
-    welcomeSection: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginHorizontal: 16,
-      marginTop: 16,
-      marginBottom: 8,
-      borderRadius: 16,
-      borderWidth: 1.5,
-      padding: 16,
-    },
-    welcomeIcon: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 16,
-    },
-    welcomeTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      marginBottom: 4,
-    },
-    welcomeSubtitle: {
-      fontSize: 14,
-      fontWeight: '500',
-      opacity: 0.85,
     },
     noResultsContainer: {
       alignItems: 'center',

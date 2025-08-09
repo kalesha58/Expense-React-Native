@@ -3,6 +3,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface ExpenseHeader {
   title: string;
   department: string;
+  // New required fields for payload
+  mobileTransactionId?: string;
+  employeeId?: string;
+  orgId?: number;
+  departmentCode?: string;
+  currency?: string;
+  approverId?: string;
+  purpose?: string;
+  expenseReportId?: string;
+  reportHeaderId?: string;
+  userId?: string;
+  respId?: string;
 }
 
 export interface LineItem {
@@ -16,12 +28,34 @@ export interface LineItem {
   supplier?: string;
   comment?: string;
   itemized?: ItemizedEntry[];
+  // New required fields for payload
+  lineNum?: string;
+  itemDescription?: string;
+  startDate?: string;
+  numberOfDays?: string;
+  justification?: string;
+  toLocation?: string;
+  merchantName?: string;
+  dailyRates?: number;
 }
 
 export interface ItemizedEntry {
   id: string;
+  lineItemId: string; // Foreign key to parent line item
   description: string;
   amount: number;
+  // New required fields for payload
+  currency?: string;
+  expenseType?: string;
+  date?: string;
+  location?: string;
+  supplier?: string;
+  comment?: string;
+  itemDescription?: string;
+  startDate?: string;
+  numberOfDays?: string;
+  justification?: string;
+  merchantName?: string;
 }
 
 export interface FullExpenseDraft {
@@ -32,135 +66,165 @@ export interface FullExpenseDraft {
 const EXPENSE_DRAFT_KEY = 'expense_draft';
 
 export const AsyncStorageService = {
-  // Save the entire expense draft
-  saveExpenseDraft: async (draft: FullExpenseDraft): Promise<void> => {
+  async saveExpenseDraft(header: ExpenseHeader, lineItems: LineItem[]): Promise<void> {
     try {
-      await AsyncStorage.setItem(EXPENSE_DRAFT_KEY, JSON.stringify(draft));
-      console.log('Expense draft saved successfully');
+      await AsyncStorage.setItem('expenseHeader', JSON.stringify(header));
+      await AsyncStorage.setItem('expenseLineItems', JSON.stringify(lineItems));
+      // Expense draft saved successfully
     } catch (error) {
-      console.error('Error saving expense draft:', error);
+      // Error saving expense draft
       throw error;
     }
   },
 
-  // Load the expense draft
-  loadExpenseDraft: async (): Promise<FullExpenseDraft | null> => {
+  async loadExpenseDraft(): Promise<{ header: ExpenseHeader | null; lineItems: LineItem[] }> {
     try {
-      const data = await AsyncStorage.getItem(EXPENSE_DRAFT_KEY);
-      if (data) {
-        const draft = JSON.parse(data) as FullExpenseDraft;
-        console.log('Expense draft loaded successfully');
-        return draft;
-      }
-      return null;
+      const headerData = await AsyncStorage.getItem('expenseHeader');
+      const lineItemsData = await AsyncStorage.getItem('expenseLineItems');
+      
+      const header = headerData ? JSON.parse(headerData) : null;
+      const lineItems = lineItemsData ? JSON.parse(lineItemsData) : [];
+      
+      // Expense draft loaded successfully
+      return { header, lineItems };
     } catch (error) {
-      console.error('Error loading expense draft:', error);
-      return null;
-    }
-  },
-
-  // Update header only
-  updateHeader: async (header: ExpenseHeader): Promise<void> => {
-    try {
-      const existingDraft = await AsyncStorageService.loadExpenseDraft();
-      const updatedDraft: FullExpenseDraft = {
-        header,
-        lineItems: existingDraft?.lineItems || [],
-      };
-      await AsyncStorageService.saveExpenseDraft(updatedDraft);
-    } catch (error) {
-      console.error('Error updating header:', error);
+      // Error loading expense draft
       throw error;
     }
   },
 
-  // Add a new line item
-  addLineItem: async (lineItem: LineItem): Promise<void> => {
+  async updateHeader(header: ExpenseHeader): Promise<void> {
     try {
-      const existingDraft = await AsyncStorageService.loadExpenseDraft();
-      const updatedDraft: FullExpenseDraft = {
-        header: existingDraft?.header || { title: '', department: '' },
-        lineItems: [...(existingDraft?.lineItems || []), lineItem],
-      };
-      await AsyncStorageService.saveExpenseDraft(updatedDraft);
+      await AsyncStorage.setItem('expenseHeader', JSON.stringify(header));
     } catch (error) {
-      console.error('Error adding line item:', error);
+      // Error updating header
       throw error;
     }
   },
 
-  // Update an existing line item
-  updateLineItem: async (updatedLineItem: LineItem): Promise<void> => {
+  async addLineItem(lineItem: LineItem): Promise<void> {
     try {
-      const existingDraft = await AsyncStorageService.loadExpenseDraft();
-      if (!existingDraft) return;
+      const existingData = await AsyncStorage.getItem('expenseLineItems');
+      const lineItems = existingData ? JSON.parse(existingData) : [];
+      lineItems.push(lineItem);
+      await AsyncStorage.setItem('expenseLineItems', JSON.stringify(lineItems));
+    } catch (error) {
+      // Error adding line item
+      throw error;
+    }
+  },
 
-      const updatedLineItems = existingDraft.lineItems.map(item =>
+  async updateLineItem(updatedLineItem: LineItem): Promise<void> {
+    try {
+      const existingData = await AsyncStorage.getItem('expenseLineItems');
+      const lineItems = existingData ? JSON.parse(existingData) : [];
+      
+      const updatedLineItems = lineItems.map((item: LineItem) =>
         item.id === updatedLineItem.id ? updatedLineItem : item
       );
-
-      const updatedDraft: FullExpenseDraft = {
-        ...existingDraft,
-        lineItems: updatedLineItems,
-      };
-      await AsyncStorageService.saveExpenseDraft(updatedDraft);
+      
+      await AsyncStorage.setItem('expenseLineItems', JSON.stringify(updatedLineItems));
     } catch (error) {
-      console.error('Error updating line item:', error);
+      // Error updating line item
       throw error;
     }
   },
 
-  // Delete a line item
-  deleteLineItem: async (lineItemId: string): Promise<void> => {
+  async deleteLineItem(lineItemId: string): Promise<void> {
     try {
-      const existingDraft = await AsyncStorageService.loadExpenseDraft();
-      if (!existingDraft) return;
-
-      const updatedLineItems = existingDraft.lineItems.filter(
-        item => item.id !== lineItemId
-      );
-
-      const updatedDraft: FullExpenseDraft = {
-        ...existingDraft,
-        lineItems: updatedLineItems,
-      };
-      await AsyncStorageService.saveExpenseDraft(updatedDraft);
+      const existingData = await AsyncStorage.getItem('expenseLineItems');
+      const lineItems = existingData ? JSON.parse(existingData) : [];
+      
+      const updatedLineItems = lineItems.filter((item: LineItem) => item.id !== lineItemId);
+      
+      await AsyncStorage.setItem('expenseLineItems', JSON.stringify(updatedLineItems));
     } catch (error) {
-      console.error('Error deleting line item:', error);
+      // Error deleting line item
       throw error;
     }
   },
 
-  // Clear the entire draft
-  clearExpenseDraft: async (): Promise<void> => {
+  async clearExpenseDraft(): Promise<void> {
     try {
-      await AsyncStorage.removeItem(EXPENSE_DRAFT_KEY);
-      console.log('Expense draft cleared successfully');
+      await AsyncStorage.removeItem('expenseHeader');
+      await AsyncStorage.removeItem('expenseLineItems');
+      // Expense draft cleared successfully
     } catch (error) {
-      console.error('Error clearing expense draft:', error);
+      // Error clearing expense draft
       throw error;
     }
   },
 
-  // Get all line items
-  getLineItems: async (): Promise<LineItem[]> => {
+  async getLineItems(): Promise<LineItem[]> {
     try {
-      const draft = await AsyncStorageService.loadExpenseDraft();
-      return draft?.lineItems || [];
+      const data = await AsyncStorage.getItem('expenseLineItems');
+      return data ? JSON.parse(data) : [];
     } catch (error) {
-      console.error('Error getting line items:', error);
+      // Error getting line items
       return [];
     }
   },
 
-  // Get header only
-  getHeader: async (): Promise<ExpenseHeader | null> => {
+  async getHeader(): Promise<ExpenseHeader | null> {
     try {
-      const draft = await AsyncStorageService.loadExpenseDraft();
-      return draft?.header || null;
+      const data = await AsyncStorage.getItem('expenseHeader');
+      return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('Error getting header:', error);
+      // Error getting header
       return null;
     }
   },
+
+  /**
+   * Store itemized expenses for a specific line item
+   */
+  async setItemizedExpenses(lineItemId: string, itemizedExpenses: ItemizedEntry[]): Promise<void> {
+    try {
+      const key = `itemizedExpenses_${lineItemId}`;
+      await AsyncStorage.setItem(key, JSON.stringify(itemizedExpenses));
+    } catch (error) {
+      console.error('Error storing itemized expenses:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get itemized expenses for a specific line item
+   */
+  async getItemizedExpenses(lineItemId: string): Promise<ItemizedEntry[]> {
+    try {
+      const key = `itemizedExpenses_${lineItemId}`;
+      const data = await AsyncStorage.getItem(key);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error retrieving itemized expenses:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get itemized count for a specific line item
+   */
+  async getItemizedCount(lineItemId: string): Promise<number> {
+    try {
+      const itemizedExpenses = await this.getItemizedExpenses(lineItemId);
+      return itemizedExpenses.length;
+    } catch (error) {
+      console.error('Error getting itemized count:', error);
+      return 0;
+    }
+  },
+
+  /**
+   * Delete itemized expenses for a specific line item
+   */
+  async deleteItemizedExpenses(lineItemId: string): Promise<void> {
+    try {
+      const key = `itemizedExpenses_${lineItemId}`;
+      await AsyncStorage.removeItem(key);
+    } catch (error) {
+      console.error('Error deleting itemized expenses:', error);
+      throw error;
+    }
+  }
 }; 

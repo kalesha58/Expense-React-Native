@@ -17,10 +17,17 @@ interface GroupedExpenseDetail {
 
 interface ExpenseHeaderCardProps {
   expense: GroupedExpenseDetail;
+  parentItemsCount?: number; // Optional count for parent items only
 }
 
-export const ExpenseHeaderCard: React.FC<ExpenseHeaderCardProps> = ({ expense }) => {
+export const ExpenseHeaderCard: React.FC<ExpenseHeaderCardProps> = ({ expense, parentItemsCount }) => {
   const { colors, shadows } = useTheme();
+  
+  console.log('ExpenseHeaderCard - Received expense data:', {
+    reportDate: expense.reportDate,
+    reportName: expense.reportName,
+    reportHeaderId: expense.reportHeaderId
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -149,7 +156,7 @@ export const ExpenseHeaderCard: React.FC<ExpenseHeaderCardProps> = ({ expense })
                 Items Count
               </Text>
               <Text style={[styles.detailValue, { color: colors.text }]}>
-                {expense.items.length} {expense.items.length === 1 ? 'Item' : 'Items'}
+                {parentItemsCount !== undefined ? parentItemsCount : expense.items.length} {(parentItemsCount !== undefined ? parentItemsCount : expense.items.length) === 1 ? 'Item' : 'Items'}
               </Text>
             </View>
           </View>
@@ -177,8 +184,9 @@ const styles = StyleSheet.create({
   headerCard: {
     borderRadius: SIZES.radius,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     borderWidth: 1,
+    marginHorizontal: SIZES.padding,
   },
   statusBadge: {
     flexDirection: 'row',

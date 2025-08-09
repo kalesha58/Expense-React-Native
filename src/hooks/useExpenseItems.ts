@@ -25,56 +25,56 @@ const useExpenseItems = (): UseExpenseItemsReturn => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetchExpenseItems();
+  }, []);
+
   const fetchExpenseItems = async () => {
     try {
       setLoading(true);
-      setError(null);
+      console.log('useExpenseItems - Starting to fetch expense items...');
       
-      logger.info('Fetching expense items from database...');
+      const items = await databaseManager.getExpenseItems();
       
-      // Check if database is initialized
-      try {
-        await databaseManager.getDatabase();
-      } catch (dbError) {
-        logger.error('Database not initialized, trying to initialize...', { dbError });
-        await databaseManager.initialize();
-      }
-      
-      // Query expense_items table
-      const items = await databaseManager.queryData('expense_items');
+      console.log('useExpenseItems - Raw database items:', { 
+        itemsLength: items.length,
+        firstItem: items[0],
+        allItems: items
+      });
       
       logger.info('Raw database items:', { items });
-      console.log('Raw expense_items from database:', items);
       
       // Transform the data to match our interface
-      const transformedItems: ExpenseItem[] = items.map((item: any) => {
+      const transformedItems = items.map(item => {
         const transformed = {
-          id: item.id || item.ExpenseItemID || item.expense_item_id,
-          expenseType: item.expenseType || item.ExpenseType || item.expense_type,
-          expenseItem: item.expenseItem || item.ExpenseItem || item.expense_item,
-          expenseReportId: item.expenseReportId || item.ExpenseReportID || item.expense_report_id,
-          flag: item.flag || item.Flag,
+          id: item.id,
+          expenseItem: item.ExpenseItem,
+          expenseType: item.ExpenseItem,
+          amount: parseFloat(item.Amount || '0'),
+          currency: item.Currency || 'USD',
+          location: item.Location || '',
+          supplier: item.Supplier || '',
+          comment: item.Comments || '',
+          date: new Date(item.TransactionDate || Date.now()),
           syncStatus: item.syncStatus || item.SyncStatus || item.sync_status,
         };
-        console.log('Transforming item:', item, 'to:', transformed);
         return transformed;
       });
       
-      // Extract unique expense types
-      const uniqueTypes = [...new Set(transformedItems.map(item => item.expenseType))].filter(Boolean);
-      
       setExpenseItems(transformedItems);
+      
+      // Extract unique expense types
+      const uniqueTypes = [...new Set(transformedItems.map(item => item.expenseItem))];
       setExpenseTypes(uniqueTypes);
-      logger.info('Expense items fetched successfully', { 
-        count: transformedItems.length,
+      
+      logger.info('Expense items loaded successfully', { 
+        count: transformedItems.length, 
         types: uniqueTypes 
       });
-      console.log('Transformed expense items:', transformedItems);
-      console.log('Available expense types:', uniqueTypes);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(errorMessage);
-      logger.error('Failed to fetch expense items', { error: errorMessage });
+      logger.error('Failed to load expense items', { error: errorMessage });
     } finally {
       setLoading(false);
     }
@@ -83,10 +83,6 @@ const useExpenseItems = (): UseExpenseItemsReturn => {
   const refetch = async () => {
     await fetchExpenseItems();
   };
-
-  useEffect(() => {
-    fetchExpenseItems();
-  }, []);
 
   return {
     expenseItems,

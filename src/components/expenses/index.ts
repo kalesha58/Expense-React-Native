@@ -16,6 +16,10 @@ export { LineItemsSection } from './LineItemsSection';
 export { LoadingFooter } from './LoadingFooter';
 export { NoAttachmentsModal } from './NoAttachmentsModal';
 export { SearchBar } from './SearchBar';
+export { SearchModal } from './SearchModal';
+export { ItemizedExpenseFormModal } from './ItemizedExpenseFormModal';
+export { AttachmentScrollView } from './AttachmentScrollView';
+export { CompactExpenseItemCard } from './CompactExpenseItemCard';
 
 // Export types
 export type { GroupedExpenseItem } from './ExpenseCard';

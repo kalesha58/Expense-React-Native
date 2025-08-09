@@ -1,6 +1,6 @@
 export { useTheme } from './useTheme';
 export { default as useDepartments } from './useDepartments';
-export { default as useExpenseDetails } from './useExpenseDetails';
+export { default as useExpenseDetails, ExpenseDetail } from './useExpenseDetails';
 export { default as useExpenseItems } from './useExpenseItems';
 export { useAttachments } from './useAttachments';
 export { useExpense } from './useExpense';

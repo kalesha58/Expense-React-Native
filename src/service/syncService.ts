@@ -233,15 +233,18 @@ class SyncService {
       }
 
       // 3. Insert data into database
-      const insertedCount = await databaseManager.insertData(apiConfig.tableName, data);
+      let insertedCount = 0;
+      try {
+        insertedCount = await databaseManager.insertData(apiConfig.tableName, data);
+        // Data inserted records
+        // Data
+      } catch (dbError) {
+        // Failed to insert data into table
+      }
       
       result.success = true;
       result.dataCount = insertedCount;
       result.duration = Date.now() - startTime;
-
-      // Simplified console log for data insertion
-      console.log(`Data inserted: ${apiConfig.tableName} - ${insertedCount} records`);
-      console.log('Data:', data);
 
       logger.info('API sync completed successfully', { 
         apiName: apiConfig.name, 

@@ -35,7 +35,7 @@ export const Header = ({
       { 
         backgroundColor: colors.primary, 
         borderBottomColor: colors.primary,
-        paddingTop: Platform.OS === 'ios' ? 44 : 0, // No extra padding needed since status bar is solid
+        paddingTop: Platform.OS === 'ios' ? 44 : 0,
       }
     ]}>
       <View style={styles.content}>
@@ -80,7 +80,9 @@ export const Header = ({
 const styles = StyleSheet.create({
   container: {
     borderBottomWidth: 1,
-    minHeight: Platform.OS === 'ios' ? 88 : 64, // Account for status bar + header height
+    minHeight: Platform.OS === 'ios' ? 88 : 64,
+    width: '100%',
+    zIndex: 1000,
   },
   content: {
     flex: 1,
@@ -105,12 +107,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   rightContainer: {
-    minWidth: 40,
-    alignItems: 'flex-end',
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     flexDirection: 'row',
-    gap: 8,
   },
   themeToggle: {
     padding: 4,
+    marginRight: 8,
   },
 }); 

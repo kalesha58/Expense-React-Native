@@ -92,23 +92,23 @@ export const LineItemsSection: React.FC<LineItemsSectionProps> = ({
       
       {lineItems.length === 0 && (
         <View style={[styles.emptyState, { backgroundColor: colors.background }]}>
-          <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '10' }]}>
-            <Feather name="receipt" size={32} color={colors.primary} />
+          <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '08' }]}>
+            <Feather name="receipt" size={20} color={colors.primary} />
           </View>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            No Line Items Added
+            No Line Items Yet
           </Text>
           <Text style={[styles.emptySubtitle, { color: colors.placeholder }]}>
-            Tap the + button above to add your first expense line item
+            Add your first expense item to get started
           </Text>
           <TouchableOpacity
             style={[styles.emptyAddButton, { borderColor: colors.primary }]}
             onPress={onAddLineItem}
             activeOpacity={0.7}
           >
-            <Feather name="plus" size={16} color={colors.primary} />
+            <Feather name="plus" size={14} color={colors.primary} />
             <Text style={[styles.emptyAddButtonText, { color: colors.primary }]}>
-              Add First Line Item
+              Add Line Item
             </Text>
           </TouchableOpacity>
         </View>
@@ -196,41 +196,41 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    padding: 40,
-    borderRadius: 16,
-    marginTop: 16,
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   emptyIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   emptyTitle: {
-    fontSize: SIZES.medium,
+    fontSize: SIZES.font,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 6,
     textAlign: 'center',
     color: '#FFFFFF',
   },
   emptySubtitle: {
     fontSize: SIZES.small,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 28,
+    lineHeight: 18,
+    marginBottom: 16,
     color: 'rgba(255, 255, 255, 0.7)',
   },
   emptyAddButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderWidth: 2,
-    borderRadius: 16,
-    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    gap: 6,
   },
   emptyAddButtonText: {
     fontSize: SIZES.font,

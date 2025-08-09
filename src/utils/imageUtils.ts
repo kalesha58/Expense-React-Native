@@ -52,8 +52,8 @@ export const convertImageToBase64 = async (fileUri: string): Promise<ImageProces
       fileName
     };
   } catch (error) {
-    console.error('Error converting image to base64:', error);
-    throw new Error('Failed to convert image to base64 format');
+    // Error converting image to base64
+    throw error;
   }
 };
 
@@ -78,8 +78,8 @@ export const getFileSize = async (fileUri: string): Promise<number> => {
     const stats = await RNFS.stat(fileUri);
     return stats.size / (1024 * 1024); // Convert to MB
   } catch (error) {
-    console.error('Error getting file size:', error);
-    return 0;
+    // Error getting file size
+    throw error;
   }
 };
 
